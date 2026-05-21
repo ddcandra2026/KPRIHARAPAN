@@ -287,10 +287,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   <div class="sp-title">KPRI Harapan</div>
   <div class="sp-sub">Koperasi Pegawai Republik Indonesia</div>
   <div id="lbox">
-    <div class="lhint"><b>Demo Login:</b><br>
-      👤 Anggota: <b>dwi / 1234</b> &nbsp;|&nbsp; <b>naning / 1234</b><br>
-      🔑 Pengurus: <b>pengurus / admin2026</b>
-    </div>
+
     <div class="role-row">
       <button class="rbtn on" onclick="setRole('anggota',this)">👤 Anggota</button>
       <button class="rbtn" onclick="setRole('pengurus',this)">🔑 Pengurus</button>
@@ -298,7 +295,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <label class="ll">Username</label>
     <input class="li" id="l-user" placeholder="Masukkan username..." type="text" autocomplete="username">
     <label class="ll">Password</label>
-    <input class="li" id="l-pass" placeholder="Masukkan password..." type="password" autocomplete="current-password">
+    <div style="position:relative;">
+      <input class="li" id="l-pass" placeholder="Masukkan password..." type="password" autocomplete="current-password" style="padding-right:44px;margin-bottom:0;">
+      <button type="button" onclick="toggleLoginPass()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;color:rgba(255,255,255,.6);" id="btn-eye-login">👁️</button>
+    </div>
+    <div style="height:11px;"></div>
     <button class="lbtn" onclick="doLogin()">🚀 Masuk ke Sistem</button>
     <div class="lerr" id="l-err"></div>
   </div>
@@ -714,29 +715,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 <script>
 const BULAN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
 let USERS_DB={
-  dwi:{pass:'1234',pass_show:'1234',role:'anggota',memberKey:'USP-001',lastLogin:'—'},
-  naning:{pass:'1234',pass_show:'1234',role:'anggota',memberKey:'USP-007',lastLogin:'—'},
   pengurus:{pass:'admin2026',pass_show:'admin2026',role:'pengurus',memberKey:null,lastLogin:'—'},
 };
-let members=[
-  {id:'USP-001',nama:'Dwi Denia C.',jabatan:'Guru',gol:'—',username:'dwi',simpok:0,simwaj:0,sim_sukarela:0,aset_lain:0,
-   piutang:[
-    {no:1,jml_angs:60,pokok:50000000,angs:833500,angs_ke:37,sisa_angs:23,sisa_piutang:19160500,jasa_bln:500000,jml_jasa:11500000,pelunasan:30660500},
-    {no:2,jml_angs:60,pokok:50000000,angs:833500,angs_ke:13,sisa_angs:47,sisa_piutang:39164500,jasa_bln:500000,jml_jasa:23500000,pelunasan:62664500},
-    {no:3,jml_angs:60,pokok:50000000,angs:833500,angs_ke:11,sisa_angs:49,sisa_piutang:40831500,jasa_bln:500000,jml_jasa:24500000,pelunasan:65331500},
-    {no:4,jml_angs:60,pokok:50000000,angs:833500,angs_ke:8,sisa_angs:52,sisa_piutang:43332000,jasa_bln:500000,jml_jasa:26000000,pelunasan:69332000},
-    {no:5,jml_angs:60,pokok:41962600,angs:713500,angs_ke:7,sisa_angs:53,sisa_piutang:36968100,jasa_bln:419626,jml_jasa:22240178,pelunasan:59208278},
-   ],riwayat:[]},
-  {id:'USP-007',nama:'Naning S.',jabatan:'Guru',gol:'—',username:'naning',simpok:0,simwaj:0,sim_sukarela:0,aset_lain:0,
-   piutang:[
-    {no:1,jml_angs:60,pokok:50000000,angs:833500,angs_ke:13,sisa_angs:47,sisa_piutang:39164500,jasa_bln:500000,jml_jasa:23500000,pelunasan:62664500},
-   ],riwayat:[]},
-];
+let members=[];
 let transactions=[],announcements=[],chatMessages=[];
-let notifList=[
-  {text:'Angsuran Mei 2026 jatuh tempo. Segera lakukan pembayaran.',time:'Baru saja',color:'var(--err)'},
-  {text:'Iuran wajib Mei 2026 belum dibayar. Batas 25 Mei 2026.',time:'1 jam lalu',color:'var(--acc)'},
-];
+let notifList=[];
 let currentUser=null,currentRole='anggota',txTypeSelected='D',charts={},ovaCurrentMemberId=null,passVisible=false;
 
 // HELPERS
@@ -752,6 +735,13 @@ function openOv(id){document.getElementById(id).classList.add('on');}
 function genUsername(nama){return nama.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g,'');}
 function genDefaultPass(noAnggota){return noAnggota.toLowerCase().replace(/[^a-z0-9]/g,'');}
 
+// TOGGLE PASSWORD VISIBILITY LOGIN
+function toggleLoginPass(){
+  const inp=document.getElementById('l-pass');
+  const btn=document.getElementById('btn-eye-login');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁️';}
+}
 // AUTH
 function setRole(r,el){currentRole=r;document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
 function doLogin(){
