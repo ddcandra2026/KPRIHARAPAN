@@ -307,7 +307,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .cred-val{font-weight:800;color:var(--pri);font-family:monospace;background:#fff;padding:3px 9px;border-radius:6px;border:1px solid var(--border);font-size:.82rem;}
 </style></head>
 <body>
-<div id="fb-loading"><div class="fb-spinner"></div><div class="fb-txt">Menghubungkan ke server...</div></div>
+<div id="fb-loading"><div class="fb-spinner"></div><div class="fb-txt" id="fb-loading-txt">Menghubungkan ke server...</div></div>
 <div id="splash">
   <div class="sp-c sp-c1"></div><div class="sp-c sp-c2"></div>
   <div id="sp-logo-wrap"><div class="sp-logo" id="sp-logo-icon">🏦</div></div>
@@ -342,6 +342,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         </div>
       </div>
       <div class="tb-acts">
+        <button class="tb-btn" onclick="manualRefresh()" title="Refresh data dari server" id="btn-refresh" style="font-size:.7rem;font-weight:800;">🔄</button>
         <button class="tb-btn" onclick="toggleNP()">🔔<span class="ndot"></span></button>
         <button class="tb-btn" onclick="goPage('profil')">👤</button>
         <button class="tb-btn" onclick="doLogout()">🚪</button>
@@ -828,17 +829,35 @@ let _fbUnsubChat=null; // realtime chat listener
 // ========== FIREBASE SYNC HELPERS ==========
 function fbDb(){return window._fb?window._fb.db:null;}
 function fbRef(path){const {db,ref}=window._fb;return ref(db,path);}
-function fbSet(path,data){if(!window._fb)return;const {db,ref,set}=window._fb;return set(ref(db,path),data);}
+function fbSet(path,data){if(!window._fb)return Promise.resolve();const {db,ref,set}=window._fb;return set(ref(db,path),data);}
 function fbGet(path){if(!window._fb)return Promise.resolve(null);const {db,ref,get}=window._fb;return get(ref(db,path));}
 function fbPush(path,data){if(!window._fb)return;const {db,ref,push}=window._fb;return push(ref(db,path),data);}
 function fbRemove(path){if(!window._fb)return;const {db,ref,remove}=window._fb;return remove(ref(db,path));}
 function fbUpdate(path,data){if(!window._fb)return;const {db,ref,update}=window._fb;return update(ref(db,path),data);}
 
-async function fbSaveMembers(){await fbSet('members',members.length?members:null);}
+// Firebase stores arrays as objects with numeric keys — convert back to real arrays
+function toSafeArray(val){
+  if(!val)return[];
+  if(Array.isArray(val))return val;
+  // Firebase converts array to {0:{...},1:{...}} — convert back
+  return Object.values(val);
+}
+
+// Sanitize a member object to ensure all array fields are real arrays
+function sanitizeMember(m){
+  if(!m)return m;
+  m.piutang=toSafeArray(m.piutang);
+  m.riwayat=toSafeArray(m.riwayat);
+  return m;
+}
+
+async function fbSaveMembers(){
+  // Save members: store as plain array (Firebase will store as object, but we convert back on load)
+  await fbSet('members', members.length ? members : null);
+}
 async function fbSaveTransactions(){await fbSet('transactions',transactions.length?transactions:null);}
 async function fbSaveAnnouncements(){await fbSet('announcements',announcements.length?announcements:null);}
 async function fbSaveUsers(){
-  // Save USERS_DB excluding default pengurus pass in plaintext — but for simplicity save all
   await fbSet('users_db',USERS_DB);
 }
 
@@ -847,12 +866,18 @@ async function loadDataFromFirebase(){
     const [mSnap,tSnap,aSnap,uSnap]=await Promise.all([
       fbGet('members'),fbGet('transactions'),fbGet('announcements'),fbGet('users_db')
     ]);
-    if(mSnap&&mSnap.exists())members=mSnap.val()||[];
-    if(tSnap&&tSnap.exists())transactions=tSnap.val()||[];
-    if(aSnap&&aSnap.exists())announcements=aSnap.val()||[];
+    // Convert Firebase object back to arrays and sanitize nested arrays
+    if(mSnap&&mSnap.exists()){
+      members = toSafeArray(mSnap.val()).map(sanitizeMember).filter(Boolean);
+    }
+    if(tSnap&&tSnap.exists()){
+      transactions = toSafeArray(tSnap.val()).filter(Boolean);
+    }
+    if(aSnap&&aSnap.exists()){
+      announcements = toSafeArray(aSnap.val()).filter(Boolean);
+    }
     if(uSnap&&uSnap.exists()){
       const remote=uSnap.val()||{};
-      // Merge: remote takes precedence, always keep pengurus if not in remote
       USERS_DB={...USERS_DB,...remote};
     }
   }catch(e){
@@ -868,13 +893,11 @@ function subscribeChat(){
   _fbUnsubChat=onValue(ref(db,'chat'),snap=>{
     if(snap.exists()){
       const data=snap.val();
-      chatMessages=Array.isArray(data)?data:Object.values(data);
-      chatMessages.sort((a,b)=>a.id-b.id);
-      // If on chat page, re-render
+      chatMessages=toSafeArray(data).filter(Boolean);
+      chatMessages.sort((a,b)=>(a.id||0)-(b.id||0));
       if(document.getElementById('pg-chat')&&document.getElementById('pg-chat').classList.contains('on')){
         renderChat();
       } else {
-        // Show badge
         document.getElementById('chat-badge').style.display='';
       }
     }
@@ -915,7 +938,7 @@ async function doLogin(){
   try{
     await loadDataFromFirebase();
   }catch(e){}
-  if(lbtn){lbtn.disabled=false;lbtn.textContent='🚀 Masuk ke Aplikasi';}
+  if(lbtn){lbtn.disabled=false;lbtn.textContent='🚀 Masuk ke Sistem';}
   const data=USERS_DB[u];
   if(!data){err.textContent='❌ Username tidak ditemukan';return;}
   if(data.pass!==p){err.textContent='❌ Password salah';return;}
@@ -936,6 +959,19 @@ async function doLogin(){
   setTimeout(()=>document.getElementById('splash').style.display='none',600);
 }
 function doLogout(){location.reload();}
+async function manualRefresh(){
+  const btn=document.getElementById('btn-refresh');
+  if(btn){btn.textContent='⏳';btn.disabled=true;}
+  try{
+    await loadDataFromFirebase();
+    setupRole();renderAll();
+    showToast('✅ Data berhasil diperbarui dari server','ok');
+  }catch(e){
+    showToast('❌ Gagal refresh: '+e.message,'err');
+  }finally{
+    if(btn){btn.textContent='🔄';btn.disabled=false;}
+  }
+}
 function setupRole(){
   const isP=currentUser.role==='pengurus';
   ['btn-add-tx','btn-add-member','mi-tambah','btn-add-ann'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isP?'':'none';});
@@ -1722,10 +1758,20 @@ function hideFbLoading(){
   const el=document.getElementById('fb-loading');
   if(el){el.classList.add('hide');setTimeout(()=>el.style.display='none',500);}
 }
+function showFbError(){
+  const txt=document.getElementById('fb-loading-txt');
+  if(txt){txt.innerHTML='⚠️ Koneksi ke Firebase gagal.<br><span style="font-size:.72rem;opacity:.75;">Cek Rules di Firebase Console:<br>Database → Rules → set read/write: true</span>';}
+  // Still allow app to open after showing error
+  setTimeout(hideFbLoading,4000);
+}
 if(window._fbReady){hideFbLoading();}
 else{
   document.addEventListener('firebase-ready',hideFbLoading);
-  setTimeout(hideFbLoading,4000); // fallback
+  // If not ready in 5s, show error then dismiss
+  setTimeout(()=>{
+    if(!window._fbReady)showFbError();
+    else hideFbLoading();
+  },5000);
 }
 </script>
 </body>
