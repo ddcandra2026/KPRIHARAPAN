@@ -4,12 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>KPRI Harapan — Koperasi Simpan Pinjam</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=DM+Sans:wght@700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script type="module" id="firebase-init">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-  import { getDatabase, ref, set, get, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
-
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
   const firebaseConfig = {
     apiKey: "AIzaSyD-OFY2sfut6LeUSvi_3xjcU4CmmKTdKZE",
     authDomain: "kpri-harapan.firebaseapp.com",
@@ -19,13 +18,27 @@
     messagingSenderId: "288948311856",
     appId: "1:288948311856:web:80e8da97439477c31fdaf5"
   };
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  // Expose Firebase helpers to global scope
-  window._fb = { db, ref, set, get, onValue, push, remove, update };
-  window._fbReady = true;
-  document.dispatchEvent(new Event('firebase-ready'));
+  try {
+    firebase.initializeApp(firebaseConfig);
+    const _db = firebase.database();
+    // Expose helpers using compat API (no ES module needed)
+    window._fb = {
+      db: _db,
+      ref: (path) => _db.ref(path),
+      set: (ref, data) => ref.set(data),
+      get: (ref) => ref.get(),
+      push: (ref, data) => ref.push(data),
+      onValue: (ref, cb) => { ref.on('value', cb); return () => ref.off('value', cb); },
+      remove: (ref) => ref.remove(),
+      update: (ref, data) => ref.update(data),
+    };
+    window._fbReady = true;
+    document.dispatchEvent(new Event('firebase-ready'));
+  } catch(e) {
+    console.warn('Firebase init error:', e);
+    window._fbReady = false;
+    document.dispatchEvent(new Event('firebase-ready'));
+  }
 </script>
 <style>
 :root{
@@ -40,7 +53,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
-body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;}
 #splash{position:fixed;inset:0;z-index:9999;background:linear-gradient(150deg,var(--pri-d),var(--pri),var(--pri-l));display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s;}
 #splash.hide{opacity:0;pointer-events:none;}
 .sp-c{position:absolute;border-radius:50%;background:rgba(255,255,255,.05);}
@@ -48,7 +61,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .sp-c2{width:150px;height:150px;bottom:80px;left:-45px;}
 .sp-logo{width:82px;height:82px;background:rgba(255,255,255,.15);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;margin-bottom:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);border:2px solid rgba(255,255,255,.25);animation:pop .6s cubic-bezier(.34,1.56,.64,1);}
 @keyframes pop{from{transform:scale(.4);opacity:0;}to{transform:scale(1);opacity:1;}}
-.sp-title{font-family:'Syne',sans-serif;font-size:1.75rem;color:#fff;font-weight:900;letter-spacing:-.5px;animation:fu .5s .2s both;}
+.sp-title{font-family:'DM Sans',sans-serif;font-size:1.75rem;color:#fff;font-weight:900;letter-spacing:-.5px;animation:fu .5s .2s both;}
 .sp-sub{color:rgba(255,255,255,.6);font-size:.79rem;margin-top:3px;margin-bottom:30px;animation:fu .5s .3s both;}
 @keyframes fu{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 #lbox{background:rgba(255,255,255,.09);backdrop-filter:blur(24px);border:1.5px solid rgba(255,255,255,.18);border-radius:22px;padding:22px 18px;width:calc(100% - 32px);max-width:380px;animation:fu .5s .4s both;}
@@ -68,17 +81,17 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 #app.on{display:flex;}
 .topbar{background:linear-gradient(135deg,var(--pri-d),var(--pri));padding:12px 15px 11px;flex-shrink:0;z-index:50;}
 .tb-row{display:flex;align-items:center;justify-content:space-between;}
-.tb-brand{font-family:'Syne',sans-serif;font-size:1rem;color:#fff;font-weight:900;}
+.tb-brand{font-family:'DM Sans',sans-serif;font-size:1rem;color:#fff;font-weight:900;}
 .tb-greet{font-size:.69rem;color:rgba(255,255,255,.6);margin-top:1px;}
 .tb-name{color:rgba(255,255,255,.95);font-weight:800;}
 .tb-acts{display:flex;gap:6px;}
 .tb-btn{background:rgba(255,255,255,.13);border:none;border-radius:9px;width:33px;height:33px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:.87rem;position:relative;}
 .tb-btn:active{background:rgba(255,255,255,.22);}
 .ndot{position:absolute;top:5px;right:5px;width:7px;height:7px;background:var(--acc);border-radius:50%;border:1.5px solid var(--pri);}
-.np{position:absolute;top:0;left:0;right:0;background:#fff;z-index:60;border-radius:0 0 18px 18px;box-shadow:var(--sh-lg);transform:translateY(-110%);transition:.3s cubic-bezier(.34,1,.64,1);padding:12px 14px 15px;max-height:60vh;overflow-y:auto;}
-.np.on{transform:translateY(0);}
+.np{position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-110%);width:100%;max-width:480px;background:#fff;z-index:300;border-radius:0 0 20px 20px;box-shadow:0 8px 40px rgba(0,0,0,.18);transition:.3s cubic-bezier(.34,1,.64,1);padding:12px 14px 15px;max-height:65vh;overflow-y:auto;}
+.np.on{transform:translateX(-50%) translateY(0);}
 .np-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
-.np-t{font-family:'Syne',sans-serif;font-size:.89rem;font-weight:900;}
+.np-t{font-family:'DM Sans',sans-serif;font-size:.89rem;font-weight:900;}
 .np-item{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
 .np-item:last-child{border:none;}
 .np-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px;}
@@ -98,12 +111,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .page.on{display:block;animation:fu .22s ease;}
 .card{background:var(--card);border-radius:14px;padding:14px;box-shadow:var(--sh);margin-bottom:10px;}
 .card-t{font-size:.69rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px;}
-.sec-t{font-family:'Syne',sans-serif;font-size:.91rem;font-weight:900;color:var(--text);margin-bottom:9px;}
+.sec-t{font-family:'DM Sans',sans-serif;font-size:.91rem;font-weight:900;color:var(--text);margin-bottom:9px;}
 .sec-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
 .hero{background:linear-gradient(135deg,var(--pri-d),var(--pri-l));border-radius:17px;padding:17px 15px;color:#fff;margin-bottom:10px;position:relative;overflow:hidden;}
 .hero::before{content:'';position:absolute;top:-38px;right:-38px;width:130px;height:130px;background:rgba(255,255,255,.07);border-radius:50%;}
 .hero-lbl{font-size:.69rem;opacity:.7;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
-.hero-amt{font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:900;margin:3px 0 11px;letter-spacing:-1px;}
+.hero-amt{font-family:'DM Sans',sans-serif;font-size:1.7rem;font-weight:900;margin:3px 0 11px;letter-spacing:-1px;}
 .hero-chips{display:flex;gap:7px;}
 .hchip{flex:1;background:rgba(255,255,255,.12);border-radius:9px;padding:8px;}
 .hchip-l{font-size:.63rem;opacity:.72;}
@@ -232,7 +245,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .sheet{background:#fff;border-radius:20px 20px 0 0;padding:18px 15px calc(18px + env(safe-area-inset-bottom));width:100%;max-height:93vh;overflow-y:auto;transform:translateY(100%);transition:.27s cubic-bezier(.34,1,.64,1);}
 .ov.on .sheet{transform:translateY(0);}
 .sh-handle{width:34px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;}
-.sh-title{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:900;margin-bottom:2px;}
+.sh-title{font-family:'DM Sans',sans-serif;font-size:1.05rem;font-weight:900;margin-bottom:2px;}
 .sh-sub{font-size:.74rem;color:var(--muted);margin-bottom:14px;}
 .dg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;}
 .db{background:var(--bg);border-radius:10px;padding:9px;}
@@ -246,7 +259,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .sim-chip-l{font-size:.63rem;opacity:.75;}
 .sim-chip-v{font-weight:800;margin-top:2px;font-size:.83rem;}
 .rk-head{background:linear-gradient(135deg,var(--pri-d),var(--pri));border-radius:13px;padding:14px;margin-bottom:10px;color:#fff;}
-.rk-title{font-family:'Syne',sans-serif;font-size:.95rem;font-weight:900;}
+.rk-title{font-family:'DM Sans',sans-serif;font-size:.95rem;font-weight:900;}
 .rk-period{font-size:.72rem;opacity:.7;margin-top:2px;}
 .rk-stats{display:flex;gap:6px;margin-top:9px;}
 .rk-stat{flex:1;text-align:center;background:rgba(255,255,255,.12);border-radius:8px;padding:7px;}
@@ -261,7 +274,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .cw{position:relative;height:163px;margin:6px 0;}
 .prof-hero{background:linear-gradient(135deg,var(--pri-d),var(--pri-l));border-radius:15px;padding:16px;color:#fff;text-align:center;margin-bottom:10px;}
 .prof-ava{width:63px;height:63px;background:rgba(255,255,255,.2);border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:1.75rem;font-weight:900;margin:0 auto 9px;border:2px solid rgba(255,255,255,.3);}
-.prof-name{font-family:'Syne',sans-serif;font-size:.99rem;font-weight:900;}
+.prof-name{font-family:'DM Sans',sans-serif;font-size:.99rem;font-weight:900;}
 .prof-id{font-size:.72rem;opacity:.72;margin-top:2px;}
 .prof-chips{display:flex;gap:6px;justify-content:center;margin-top:9px;flex-wrap:wrap;}
 .prof-chip{background:rgba(255,255,255,.15);border-radius:20px;padding:3px 10px;font-size:.68rem;font-weight:700;}
@@ -353,6 +366,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <div class="np-hd"><div class="np-t">🔔 Notifikasi</div><button onclick="toggleNP()" class="btn btn-ghost btn-sm">Tutup ✕</button></div>
     <div id="np-list"></div>
   </div>
+  <div id="np-overlay" onclick="toggleNP()" style="display:none;position:fixed;inset:0;z-index:299;background:rgba(0,0,0,.3);backdrop-filter:blur(1px);"></div>
   <div class="scroller" id="scroller">
     <!-- BERANDA -->
     <div class="page on" id="pg-beranda">
@@ -372,9 +386,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         </div>
         <div class="tag-grid">
           <div class="tag-item"><div class="tag-item-lbl">💳 Angsuran</div><div class="tag-item-val" id="tag-angs">—</div><span class="badge b-acc">Belum Bayar</span></div>
-          <div class="tag-item"><div class="tag-item-lbl">📋 Iuran Wajib</div><div class="tag-item-val">Rp 250.000</div><span class="badge b-acc">Belum Bayar</span></div>
+          <div class="tag-item"><div class="tag-item-lbl">📋 Iuran Wajib</div><div class="tag-item-val" id="tag-iuran-val">—</div><span class="badge b-acc" id="tag-iuran-badge">Belum Bayar</span></div>
         </div>
-        <button class="tag-btn" onclick="showToast('✅ Hubungi bendahara untuk pembayaran','ok')">💰 Bayar Sekarang</button>
+        <button class="tag-btn" onclick="goPage('simpanan')">💰 Bayar Iuran Wajib</button>
       </div>
       <div class="card" id="prog-card"><div class="card-t">📊 Progress Pelunasan Pinjaman</div><div id="prog-list"></div></div>
       <div class="sg3">
@@ -386,6 +400,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       <div class="mgrid">
         <div class="mi" onclick="goPage('transaksi')"><div class="mi-ico">💳</div><div class="mi-lbl">Transaksi</div></div>
         <div class="mi" onclick="goPage('simpanan')"><div class="mi-ico">🏦</div><div class="mi-lbl">Simpanan</div></div>
+        <div class="mi" onclick="goPage('simpanan');setTimeout(()=>document.getElementById('iuran-list').scrollIntoView({behavior:'smooth'}),300)"><div class="mi-ico">📋</div><div class="mi-lbl">Iuran Wajib</div></div>
         <div class="mi" onclick="goPage('pinjaman')"><div class="mi-ico">💸</div><div class="mi-lbl">Pinjaman</div></div>
         <div class="mi" onclick="goPage('anggota')"><div class="mi-ico">👥</div><div class="mi-lbl">Anggota</div></div>
         <div class="mi" onclick="goPage('laporan')"><div class="mi-ico">📊</div><div class="mi-lbl">Laporan</div></div>
@@ -427,7 +442,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       <div class="sec-t">🏦 Simpanan Saya</div>
       <div class="sim-card teal">
         <div style="font-size:.68rem;opacity:.75;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total Simpanan</div>
-        <div style="font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:900;margin:4px 0 11px;" id="sim-total">—</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:1.7rem;font-weight:900;margin:4px 0 11px;" id="sim-total">—</div>
         <div class="sim-chips">
           <div class="sim-chip"><div class="sim-chip-l">Pokok</div><div class="sim-chip-v" id="sim-pokok">—</div></div>
           <div class="sim-chip"><div class="sim-chip-l">Wajib</div><div class="sim-chip-v" id="sim-wajib">—</div></div>
@@ -445,7 +460,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       <div class="sec-t">💸 Pinjaman &amp; Piutang</div>
       <div class="sim-card pur">
         <div style="font-size:.68rem;opacity:.75;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total Sisa Piutang</div>
-        <div style="font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:900;margin:4px 0 11px;" id="pin-total">—</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:1.7rem;font-weight:900;margin:4px 0 11px;" id="pin-total">—</div>
         <div class="sim-chips">
           <div class="sim-chip"><div class="sim-chip-l">Jml Pinjaman</div><div class="sim-chip-v" id="pin-count">—</div></div>
           <div class="sim-chip"><div class="sim-chip-l">Angs/Bln</div><div class="sim-chip-v" id="pin-angs">—</div></div>
@@ -475,7 +490,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     </div>
     <!-- LAPORAN -->
     <div class="page" id="pg-laporan">
-      <div class="sec-t">📊 Laporan &amp; Rekening Koran</div>
+      <div class="sec-t" id="lap-title">📊 Laporan &amp; Rekening Koran</div>
       <div class="fbar">
         <button class="fb on" onclick="setFilter('hari',this)">📅 Harian</button>
         <button class="fb" onclick="setFilter('minggu',this)">📆 Mingguan</button>
@@ -656,6 +671,17 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <!-- TAB INFO -->
     <div id="ova-panel-info">
       <div class="dg" id="ova-dg"></div>
+      <!-- Pengaturan Iuran Wajib - hanya tampil untuk pengurus -->
+      <div id="ova-iuran-section" style="display:none;margin-bottom:10px;">
+        <div class="akt-section">
+          <div class="akt-title">📋 Iuran Wajib Bulanan</div>
+          <div class="i2">
+            <div class="fg"><label class="fl">Besaran Iuran/Bulan (Rp)</label><input type="number" class="fi" id="ova-iuran-val" placeholder="Contoh: 150000" min="0"></div>
+          </div>
+          <div style="font-size:.71rem;color:var(--muted);margin-bottom:8px;">Kosongkan / isi 0 jika anggota ini tidak dikenakan iuran wajib.</div>
+          <button class="btn btn-ok btn-full" onclick="saveIuranWajib()">💾 Simpan Iuran Wajib</button>
+        </div>
+      </div>
       <div class="sec-t" style="font-size:.8rem;margin-bottom:7px;">📋 Tabel Sisa Piutang</div>
       <div class="ptw"><table class="pt">
         <thead><tr><th>No</th><th>Pokok</th><th>Angs/Bln</th><th>Angs ke</th><th>Sisa Angs</th><th>Sisa Piutang</th><th>Jasa/Bln</th><th>Jml Jasa</th><th>Pelunasan</th></tr></thead>
@@ -830,9 +856,18 @@ let notifList=[];
 let currentUser=null,currentRole='anggota',txTypeSelected='D',charts={},ovaCurrentMemberId=null,passVisible=false;
 
 // ========== FIREBASE SYNC HELPERS ==========
-function fbSet(path,data){if(!window._fb)return Promise.resolve();const {db,ref,set}=window._fb;return set(ref(db,path),data);}
-function fbGet(path){if(!window._fb)return Promise.resolve(null);const {db,ref,get}=window._fb;return get(ref(db,path));}
-function fbPush(path,data){if(!window._fb)return Promise.resolve();const {db,ref,push}=window._fb;return push(ref(db,path),data);}
+function fbSet(path,data){
+  if(!window._fb)return Promise.resolve();
+  return window._fb.ref(path).set(data);
+}
+function fbGet(path){
+  if(!window._fb)return Promise.resolve(null);
+  return window._fb.ref(path).get();
+}
+function fbPush(path,data){
+  if(!window._fb)return Promise.resolve();
+  return window._fb.ref(path).push(data);
+}
 
 // Firebase turns arrays into {0:{},1:{}} — always convert back
 function toSafeArray(val){
@@ -844,6 +879,8 @@ function sanitizeMember(m){
   if(!m)return null;
   m.piutang=toSafeArray(m.piutang);
   m.riwayat=toSafeArray(m.riwayat);
+  m.iuran_history=toSafeArray(m.iuran_history||[]);
+  if(!m.iuran_wajib)m.iuran_wajib=0;
   return m;
 }
 
@@ -877,13 +914,17 @@ function unsubscribeAll(){_unsubs.forEach(fn=>fn());_unsubs=[];}
 function subscribeRealtime(){
   if(!window._fb)return;
   unsubscribeAll();
-  const {db,ref,onValue}=window._fb;
+
+  function listenPath(path, cb){
+    const r=window._fb.ref(path);
+    r.on('value', cb);
+    return ()=>r.off('value', cb);
+  }
 
   // MEMBERS — live sync
-  _unsubs.push(onValue(ref(db,'members'),snap=>{
+  _unsubs.push(listenPath('members',snap=>{
     const raw=snap.exists()?snap.val():null;
     members=toSafeArray(raw).map(sanitizeMember).filter(Boolean);
-    // Re-render affected views
     if(isPageActive('beranda'))renderBeranda();
     if(isPageActive('anggota'))renderMembers('');
     refreshKKSelect();
@@ -892,7 +933,7 @@ function subscribeRealtime(){
   }));
 
   // TRANSACTIONS — live sync
-  _unsubs.push(onValue(ref(db,'transactions'),snap=>{
+  _unsubs.push(listenPath('transactions',snap=>{
     const raw=snap.exists()?snap.val():null;
     transactions=toSafeArray(raw).filter(Boolean);
     if(isPageActive('beranda'))renderBeranda();
@@ -902,7 +943,7 @@ function subscribeRealtime(){
 
   // ANNOUNCEMENTS — live sync
   let _lastAnnCount=0;
-  _unsubs.push(onValue(ref(db,'announcements'),snap=>{
+  _unsubs.push(listenPath('announcements',snap=>{
     const raw=snap.exists()?snap.val():null;
     const incoming=toSafeArray(raw).filter(Boolean);
     const isNew=incoming.length>_lastAnnCount&&_lastAnnCount>0;
@@ -918,13 +959,13 @@ function subscribeRealtime(){
     renderNP();
   }));
 
-  // USERS_DB — live sync (password changes, new accounts)
-  _unsubs.push(onValue(ref(db,'users_db'),snap=>{
+  // USERS_DB — live sync
+  _unsubs.push(listenPath('users_db',snap=>{
     if(snap.exists()) USERS_DB={...USERS_DB,...(snap.val()||{})};
   }));
 
   // CHAT — live sync + badge
-  _unsubs.push(onValue(ref(db,'chat'),snap=>{
+  _unsubs.push(listenPath('chat',snap=>{
     const raw=snap.exists()?snap.val():null;
     const incoming=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
     const hadNew=incoming.length>chatMessages.length;
@@ -1062,7 +1103,16 @@ function renderBeranda(){
     document.getElementById('h-piutang').textContent=fmtShort(tot.sisa_piutang);
     document.getElementById('h-angsuran').textContent=fmtShort(tot.total_angs);
     document.getElementById('tag-angs').textContent=fmtRp(tot.total_angs);
-    document.getElementById('tag-total').textContent=fmtRp(tot.total_angs+250000);
+    // Iuran wajib bulan ini
+    const iuranWajib=m.iuran_wajib||0;
+    const bulanIni=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+    const iuranBulanIni=(m.iuran_history||[]).find(h=>h.bulan===bulanIni);
+    const tagIuranEl=document.getElementById('tag-iuran-val');
+    const tagIuranBadge=document.getElementById('tag-iuran-badge');
+    if(tagIuranEl)tagIuranEl.textContent=iuranWajib?fmtRp(iuranWajib):'Belum diatur';
+    if(tagIuranBadge)tagIuranBadge.textContent=iuranBulanIni?'Lunas':'Belum Bayar';
+    if(tagIuranBadge)tagIuranBadge.className='badge '+(iuranBulanIni?'b-ok':'b-acc');
+    document.getElementById('tag-total').textContent=fmtRp(tot.total_angs+(iuranBulanIni?0:iuranWajib));
     let html='';
     m.piutang.forEach(p=>{
       const done=pct(p.angs_ke,p.jml_angs);const cls=done>80?'ok':done>40?'acc':'err';
@@ -1138,13 +1188,46 @@ function renderSimpanan(){
   document.getElementById('sim-pokok').textContent=fmtRp(m.simpok||0);
   document.getElementById('sim-wajib').textContent=fmtRp(m.simwaj||0);
   document.getElementById('sim-sukarela').textContent=fmtRp(m.sim_sukarela||0);
-  let html='';
-  for(let i=4;i>=0;i--){const d=new Date(2026,4-i,1);const paid=i>0;
-    html+=`<div class="txi"><div class="tx-ico ${paid?'K':'D'}">${paid?'✅':'⏳'}</div>
-      <div class="tx-meta"><div class="tx-desc">Iuran Wajib — ${BULAN[d.getMonth()]} ${d.getFullYear()}</div>
-      <div class="tx-info2"><span class="badge ${paid?'b-ok':'b-acc'}">${paid?'Lunas':'Belum Bayar'}</span></div></div>
-      <div class="tx-right"><div class="tx-amt ${paid?'K':'D'}">${fmtRp(250000)}</div></div></div>`;}
-  document.getElementById('iuran-list').innerHTML=html;
+  // Iuran wajib bulanan dari history nyata
+  const history=m.iuran_history||[];
+  const iuranWajib=m.iuran_wajib||0;
+  if(!iuranWajib){
+    document.getElementById('iuran-list').innerHTML=`<div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">Besaran iuran wajib belum diatur pengurus</div></div>`;
+  } else {
+    // Show last 5 months
+    let html='';
+    for(let i=4;i>=0;i--){
+      const d=new Date(2026,4-i,1);
+      const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const paid=history.find(h=>h.bulan===key);
+      html+=`<div class="txi">
+        <div class="tx-ico ${paid?'K':'D'}">${paid?'✅':'⏳'}</div>
+        <div class="tx-meta">
+          <div class="tx-desc">Iuran Wajib — ${BULAN[d.getMonth()]} ${d.getFullYear()}</div>
+          <div class="tx-info2"><span class="badge ${paid?'b-ok':'b-acc'}">${paid?'Lunas':'Belum Bayar'}</span>${paid?`<span style="color:var(--muted);font-size:.63rem;margin-left:6px;">Dibayar ${fmtDate(paid.tgl)}</span>`:''}</div>
+        </div>
+        <div class="tx-right">
+          <div class="tx-amt ${paid?'K':'D'}">${fmtRp(iuranWajib)}</div>
+          ${!paid?`<button class="btn btn-pri btn-xs" style="margin-top:4px;" onclick="bayarIuran('${key}','${BULAN[d.getMonth()]} ${d.getFullYear()}')">Bayar</button>`:''}
+        </div>
+      </div>`;
+    }
+    document.getElementById('iuran-list').innerHTML=html;
+  }
+}
+
+function bayarIuran(bulan,label){
+  const m=getMemberData();if(!m)return;
+  if(!m.iuran_wajib){showToast('❌ Besaran iuran belum diatur pengurus','err');return;}
+  if(!confirm(`Konfirmasi pembayaran Iuran Wajib ${label} sebesar ${fmtRp(m.iuran_wajib)}?`))return;
+  m.iuran_history=m.iuran_history||[];
+  if(m.iuran_history.find(h=>h.bulan===bulan)){showToast('⚠️ Iuran bulan ini sudah dibayar','err');return;}
+  m.iuran_history.push({bulan,tgl:today(),jml:m.iuran_wajib});
+  m.simwaj=(m.simwaj||0)+m.iuran_wajib;
+  transactions.unshift({id:Date.now(),tgl:today(),ket:`Iuran Wajib ${label}`,kat:'iuran_wajib',tipe:'K',jml:m.iuran_wajib,anggota:currentUser.name});
+  fbSaveMembers();fbSaveTransactions();
+  renderSimpanan();renderBeranda();
+  showToast(`✅ Iuran ${label} berhasil dibayar`,'ok');
 }
 
 function renderPinjaman(){
@@ -1246,6 +1329,11 @@ function openMember(id){
     document.getElementById('ova-new-pass').value='';
     document.getElementById('ova-default-pass').textContent=genDefaultPass(m.id);
     passVisible=false;
+    // Iuran wajib section
+    document.getElementById('ova-iuran-section').style.display='block';
+    document.getElementById('ova-iuran-val').value=m.iuran_wajib||'';
+  } else {
+    document.getElementById('ova-iuran-section').style.display='none';
   }
   document.getElementById('ova-akt-tgl').value=today();
   // reset to tab info
@@ -1322,7 +1410,13 @@ function resetPassDefault(){
   showToast(`✅ Password direset ke: ${def}`,'ok');
 }
 
-// TAMBAH ANGGOTA
+function saveIuranWajib(){
+  const m=members.find(x=>x.id===ovaCurrentMemberId);if(!m)return;
+  const val=+document.getElementById('ova-iuran-val').value||0;
+  m.iuran_wajib=val;
+  fbSaveMembers();
+  showToast(val?`✅ Iuran wajib ${m.nama}: ${fmtRp(val)}/bulan`:`✅ Iuran wajib ${m.nama} dikosongkan`,'ok');
+}
 function openAddMember(){if(currentUser.role!=='pengurus'){showToast('⛔ Hanya pengurus','err');return;}openOv('ov-add-member');}
 function updatePreviewCreds(){
   const nama=document.getElementById('n-nama').value.trim();
@@ -1346,7 +1440,7 @@ function saveMember(){
   const sisa_angs=jmlAngs-angsKe;
   const sisa_piutang=angs*sisa_angs;
   const jml_jasa=jasa*sisa_angs;
-  members.push({id:noa,nama,jabatan:document.getElementById('n-jabatan').value||'—',gol:document.getElementById('n-gol').value||'—',username:finalU,simpok:+document.getElementById('n-simpok').value||0,simwaj:+document.getElementById('n-simwaj').value||0,sim_sukarela:+document.getElementById('n-simkar').value||0,aset_lain:0,piutang:pokok>0?[{no:1,jml_angs:jmlAngs,pokok,angs,angs_ke:angsKe,sisa_angs,sisa_piutang,jasa_bln:jasa,jml_jasa,pelunasan:sisa_piutang+jml_jasa}]:[],riwayat:[]});
+  members.push({id:noa,nama,jabatan:document.getElementById('n-jabatan').value||'—',gol:document.getElementById('n-gol').value||'—',username:finalU,simpok:+document.getElementById('n-simpok').value||0,simwaj:+document.getElementById('n-simwaj').value||0,sim_sukarela:+document.getElementById('n-simkar').value||0,aset_lain:0,iuran_wajib:0,iuran_history:[],piutang:pokok>0?[{no:1,jml_angs:jmlAngs,pokok,angs,angs_ke:angsKe,sisa_angs,sisa_piutang,jasa_bln:jasa,jml_jasa,pelunasan:sisa_piutang+jml_jasa}]:[],riwayat:[]});
   USERS_DB[finalU]={pass:defPass,pass_show:defPass,role:'anggota',memberKey:noa,lastLogin:'Belum login'};
   closeOv('ov-add-member');refreshKKSelect();
   const sel=document.getElementById('tx-anggota');
@@ -1434,7 +1528,10 @@ function setorSim(){
 
 // LAPORAN
 function renderLaporan(){
-  const allTx=currentUser.role==='anggota'?transactions.filter(t=>t.anggota===currentUser.name||t.anggota==='Semua'):[...transactions];
+  const isAnggota=currentUser.role==='anggota';
+  const lapTitle=document.getElementById('lap-title');
+  if(lapTitle)lapTitle.textContent=isAnggota?'📒 Rekening Koran Saya':'📊 Laporan Keuangan Koperasi';
+  const allTx=isAnggota?transactions.filter(t=>t.anggota===currentUser.name||t.anggota==='Semua'):[...transactions];
   const totD=allTx.filter(t=>t.tipe==='D').reduce((s,t)=>s+t.jml,0);
   const totK=allTx.filter(t=>t.tipe==='K').reduce((s,t)=>s+t.jml,0);
   document.getElementById('rk-D').textContent=fmtRp(totD);
@@ -1509,8 +1606,23 @@ function attachFile(input){
 }
 
 // NOTIF
-function renderNP(){document.getElementById('np-list').innerHTML=notifList.map(n=>`<div class="np-item"><div class="np-dot" style="background:${n.color};"></div><div><div class="np-txt">${n.text}</div><div class="np-time">${n.time}</div></div></div>`).join('');}
-function toggleNP(){document.getElementById('np').classList.toggle('on');}
+function renderNP(){
+  const el=document.getElementById('np-list');
+  if(!notifList.length){
+    el.innerHTML='<div style="text-align:center;padding:28px 0;color:var(--muted);font-size:.8rem;">Belum ada notifikasi</div>';
+    return;
+  }
+  el.innerHTML=notifList.map((n,i)=>`<div class="np-item"><div class="np-dot" style="background:${n.color||'var(--pri)'};"></div>
+    <div style="flex:1"><div class="np-txt">${n.text}</div><div class="np-time">${n.time}</div></div>
+    <button onclick="notifList.splice(${i},1);renderNP();" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:2px 4px;">✕</button>
+  </div>`).join('');
+}
+function toggleNP(){
+  const np=document.getElementById('np');
+  const ov=document.getElementById('np-overlay');
+  const open=np.classList.toggle('on');
+  if(ov)ov.style.display=open?'block':'none';
+}
 
 // PROFIL
 function renderProfil(){
