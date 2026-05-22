@@ -6,6 +6,27 @@
 <title>KPRI Harapan — Koperasi Simpan Pinjam</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script type="module" id="firebase-init">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD-OFY2sfut6LeUSvi_3xjcU4CmmKTdKZE",
+    authDomain: "kpri-harapan.firebaseapp.com",
+    databaseURL: "https://kpri-harapan-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "kpri-harapan",
+    storageBucket: "kpri-harapan.firebasestorage.app",
+    messagingSenderId: "288948311856",
+    appId: "1:288948311856:web:80e8da97439477c31fdaf5"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // Expose Firebase helpers to global scope
+  window._fb = { db, ref, set, get, onValue, push, remove, update };
+  window._fbReady = true;
+  document.dispatchEvent(new Event('firebase-ready'));
+</script>
 <style>
 :root{
   --pri:#0f4c81;--pri-l:#1a6db5;--pri-d:#083258;--pri-xl:#e8f1fb;
@@ -268,6 +289,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .toast.acc{background:var(--acc);color:#000;}
 .wm{text-align:center;padding:11px 0 3px;color:var(--muted);font-size:.63rem;opacity:.6;}
 .wm b{color:var(--pri);font-weight:800;}
+#fb-loading{position:fixed;inset:0;z-index:10000;background:rgba(8,50,88,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;transition:opacity .4s;}
+#fb-loading.hide{opacity:0;pointer-events:none;}
+.fb-spinner{width:40px;height:40px;border:3.5px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.fb-txt{color:#fff;font-size:.83rem;font-weight:700;opacity:.85;}
 .info-box{background:var(--inf-l);border:1px solid #bfdbfe;border-radius:9px;padding:9px 11px;font-size:.73rem;color:#1e40af;line-height:1.6;margin-bottom:10px;}
 .info-box.ok{background:var(--ok-l);border-color:#a7f3d0;color:var(--ok-d);}
 .info-box.acc{background:var(--acc-l);border-color:#fcd34d;color:#92400e;}
@@ -281,6 +307,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .cred-val{font-weight:800;color:var(--pri);font-family:monospace;background:#fff;padding:3px 9px;border-radius:6px;border:1px solid var(--border);font-size:.82rem;}
 </style></head>
 <body>
+<div id="fb-loading"><div class="fb-spinner"></div><div class="fb-txt">Menghubungkan ke server...</div></div>
 <div id="splash">
   <div class="sp-c sp-c1"></div><div class="sp-c sp-c2"></div>
   <div id="sp-logo-wrap"><div class="sp-logo" id="sp-logo-icon">🏦</div></div>
@@ -796,6 +823,65 @@ let members=[];
 let transactions=[],announcements=[],chatMessages=[];
 let notifList=[];
 let currentUser=null,currentRole='anggota',txTypeSelected='D',charts={},ovaCurrentMemberId=null,passVisible=false;
+let _fbUnsubChat=null; // realtime chat listener
+
+// ========== FIREBASE SYNC HELPERS ==========
+function fbDb(){return window._fb?window._fb.db:null;}
+function fbRef(path){const {db,ref}=window._fb;return ref(db,path);}
+function fbSet(path,data){if(!window._fb)return;const {db,ref,set}=window._fb;return set(ref(db,path),data);}
+function fbGet(path){if(!window._fb)return Promise.resolve(null);const {db,ref,get}=window._fb;return get(ref(db,path));}
+function fbPush(path,data){if(!window._fb)return;const {db,ref,push}=window._fb;return push(ref(db,path),data);}
+function fbRemove(path){if(!window._fb)return;const {db,ref,remove}=window._fb;return remove(ref(db,path));}
+function fbUpdate(path,data){if(!window._fb)return;const {db,ref,update}=window._fb;return update(ref(db,path),data);}
+
+async function fbSaveMembers(){await fbSet('members',members.length?members:null);}
+async function fbSaveTransactions(){await fbSet('transactions',transactions.length?transactions:null);}
+async function fbSaveAnnouncements(){await fbSet('announcements',announcements.length?announcements:null);}
+async function fbSaveUsers(){
+  // Save USERS_DB excluding default pengurus pass in plaintext — but for simplicity save all
+  await fbSet('users_db',USERS_DB);
+}
+
+async function loadDataFromFirebase(){
+  try{
+    const [mSnap,tSnap,aSnap,uSnap]=await Promise.all([
+      fbGet('members'),fbGet('transactions'),fbGet('announcements'),fbGet('users_db')
+    ]);
+    if(mSnap&&mSnap.exists())members=mSnap.val()||[];
+    if(tSnap&&tSnap.exists())transactions=tSnap.val()||[];
+    if(aSnap&&aSnap.exists())announcements=aSnap.val()||[];
+    if(uSnap&&uSnap.exists()){
+      const remote=uSnap.val()||{};
+      // Merge: remote takes precedence, always keep pengurus if not in remote
+      USERS_DB={...USERS_DB,...remote};
+    }
+  }catch(e){
+    console.warn('Firebase load error:',e);
+    showToast('⚠️ Gagal load data Firebase, mode offline','err');
+  }
+}
+
+function subscribeChat(){
+  if(!window._fb)return;
+  if(_fbUnsubChat)_fbUnsubChat();
+  const {db,ref,onValue}=window._fb;
+  _fbUnsubChat=onValue(ref(db,'chat'),snap=>{
+    if(snap.exists()){
+      const data=snap.val();
+      chatMessages=Array.isArray(data)?data:Object.values(data);
+      chatMessages.sort((a,b)=>a.id-b.id);
+      // If on chat page, re-render
+      if(document.getElementById('pg-chat')&&document.getElementById('pg-chat').classList.contains('on')){
+        renderChat();
+      } else {
+        // Show badge
+        document.getElementById('chat-badge').style.display='';
+      }
+    }
+  });
+}
+// ========== END FIREBASE SYNC HELPERS ==========
+
 
 // HELPERS
 function fmtRp(n){return'Rp '+(+n||0).toLocaleString('id-ID');}
@@ -819,11 +905,17 @@ function toggleLoginPass(){
 }
 // AUTH
 function setRole(r,el){currentRole=r;document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('l-user').value.trim().toLowerCase();
   const p=document.getElementById('l-pass').value;
   const err=document.getElementById('l-err');
   if(!u||!p){err.textContent='❌ Username dan password wajib diisi';return;}
+  // Show loading
+  const lbtn=document.querySelector('.lbtn');if(lbtn){lbtn.disabled=true;lbtn.textContent='Memuat data...';}
+  try{
+    await loadDataFromFirebase();
+  }catch(e){}
+  if(lbtn){lbtn.disabled=false;lbtn.textContent='🚀 Masuk ke Aplikasi';}
   const data=USERS_DB[u];
   if(!data){err.textContent='❌ Username tidak ditemukan';return;}
   if(data.pass!==p){err.textContent='❌ Password salah';return;}
@@ -832,6 +924,7 @@ function doLogin(){
   const m=data.memberKey?members.find(x=>x.id===data.memberKey):null;
   currentUser={...data,username:u,name:m?m.nama:'Admin Koperasi'};
   USERS_DB[u].lastLogin=fmtDate(today())+' '+nowTime();
+  fbSaveUsers();
   document.getElementById('tb-name').textContent=currentUser.name;
   document.getElementById('tb-rbadge').textContent=data.role==='pengurus'?'🔑 Pengurus':'👤 Anggota';
   document.getElementById('tb-rbadge').className='badge '+(data.role==='pengurus'?'b-acc':'b-ok');
@@ -839,6 +932,7 @@ function doLogin(){
   document.getElementById('splash').classList.add('hide');
   document.getElementById('app').classList.add('on');
   setupRole();renderAll();
+  subscribeChat();
   setTimeout(()=>document.getElementById('splash').style.display='none',600);
 }
 function doLogout(){location.reload();}
@@ -1090,6 +1184,7 @@ function saveAktivitas(){
   document.getElementById('ova-akt-ket').value='';
   document.getElementById('ova-akt-tgl').value=today();
   renderOvaRiwayat();renderBeranda();
+  fbSaveTransactions();fbSaveMembers();
   notifList.unshift({text:`Aktivitas: ${ket} — ${m.nama} (${fmtRp(jml)})`,time:'Baru saja',color:tipe==='D'?'var(--err)':'var(--ok)'});
   renderNP();showToast('✅ Aktivitas berhasil disimpan','ok');
 }
@@ -1116,6 +1211,7 @@ function saveAkunAnggota(){
   const sel=document.getElementById('tx-anggota');
   sel.innerHTML='<option value="Semua">Semua Anggota</option>'+members.map(m=>`<option value="${m.nama}">${m.nama}</option>`).join('');
   renderMembers('');showToast('✅ Akun berhasil diperbarui','ok');
+  fbSaveMembers();fbSaveUsers();
 }
 
 function resetPassDefault(){
@@ -1123,6 +1219,7 @@ function resetPassDefault(){
   const def=genDefaultPass(m.id);
   USERS_DB[m.username].pass=def;USERS_DB[m.username].pass_show=def;
   document.getElementById('ova-akun-pass').textContent='••••••';passVisible=false;
+  fbSaveUsers();
   showToast(`✅ Password direset ke: ${def}`,'ok');
 }
 
@@ -1156,6 +1253,7 @@ function saveMember(){
   const sel=document.getElementById('tx-anggota');
   sel.innerHTML='<option value="Semua">Semua Anggota</option>'+members.map(m=>`<option value="${m.nama}">${m.nama}</option>`).join('');
   renderMembers('');renderBeranda();
+  fbSaveMembers();fbSaveUsers();
   showToast(`✅ ${nama} ditambahkan! Login: ${finalU} / ${defPass}`,'ok');
 }
 
@@ -1179,6 +1277,7 @@ function saveTx(){
   }
   ['tx-kat','tx-jumlah','tx-ket'].forEach(id=>document.getElementById(id).value='');
   closeOv('ov-add-tx');renderTx('all');renderBeranda();
+  fbSaveTransactions();fbSaveMembers();
   notifList.unshift({text:`Transaksi: ${ket} — ${anggota} (${fmtRp(jml)})`,time:'Baru saja',color:txTypeSelected==='D'?'var(--err)':'var(--ok)'});
   renderNP();showToast('✅ Transaksi disimpan','ok');
 }
@@ -1195,6 +1294,7 @@ function gantiPassword(){
   if(nw!==conf){showToast('❌ Konfirmasi password tidak cocok','err');return;}
   uD.pass=nw;uD.pass_show=nw;
   ['pass-old','pass-new','pass-confirm'].forEach(id=>document.getElementById(id).value='');
+  fbSaveUsers();
   showToast('✅ Password berhasil diubah!','ok');
 }
 
@@ -1214,6 +1314,7 @@ function saveKekayaan(){
   m.simwaj=+document.getElementById('kk-simwaj').value||0;
   m.sim_sukarela=+document.getElementById('kk-simkar').value||0;
   m.aset_lain=+document.getElementById('kk-aset').value||0;
+  fbSaveMembers();
   showToast(`✅ Kekayaan ${m.nama} disimpan`,'ok');
   renderBeranda();
 }
@@ -1228,6 +1329,7 @@ function setorSim(){
   transactions.unshift({id:Date.now(),tgl:today(),ket,kat:'simpanan_sukarela',tipe:'K',jml,anggota:currentUser.name});
   document.getElementById('setor-jml').value='';
   closeOv('ov-setor');renderSimpanan();renderBeranda();
+  fbSaveMembers();fbSaveTransactions();
   showToast('✅ Simpanan berhasil disetor','ok');
 }
 
@@ -1272,9 +1374,9 @@ function saveAnn(){
   if(!j||!i){showToast('❌ Lengkapi judul dan isi','err');return;}
   announcements.unshift({id:Date.now(),judul:j,isi:i,prioritas:document.getElementById('ann-pri').value,tgl:today(),author:currentUser.name});
   ['ann-judul','ann-isi'].forEach(id=>document.getElementById(id).value='');
-  closeOv('ov-add-ann');renderAnn();showToast('✅ Dipublikasikan','ok');
+  closeOv('ov-add-ann');renderAnn();fbSaveAnnouncements();showToast('✅ Dipublikasikan','ok');
 }
-function delAnn(id){if(!confirm('Hapus pengumuman ini?'))return;announcements=announcements.filter(a=>a.id!==id);renderAnn();showToast('🗑️ Dihapus');}
+function delAnn(id){if(!confirm('Hapus pengumuman ini?'))return;announcements=announcements.filter(a=>a.id!==id);renderAnn();fbSaveAnnouncements();showToast('🗑️ Dihapus');}
 
 // CHAT
 function renderChat(){
@@ -1283,8 +1385,13 @@ function renderChat(){
   el.innerHTML=chatMessages.map(m=>{const mine=m.user===currentUser.name;return`<div class="cm ${mine?'me':''}"><div class="c-ava">${m.user.charAt(0)}</div><div class="c-wrap"><div class="c-sender">${m.user} · ${m.time}</div><div class="c-bub"><div class="c-text">${m.text}</div>${m.file?`<div class="c-file ${mine?'':'ext'}">📎 ${m.file}</div>`:''}<span class="c-time">${fmtDate(m.tgl)}</span></div></div></div>`;}).join('');
   setTimeout(()=>document.getElementById('scroller').scrollTop=99999,60);
 }
-function sendChat(){const inp=document.getElementById('c-inp');const text=inp.value.trim();if(!text)return;chatMessages.push({id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today()});inp.value='';renderChat();}
-function attachFile(input){if(!input.files||!input.files[0])return;chatMessages.push({id:Date.now(),user:currentUser.name,text:'Mengirim file:',file:input.files[0].name,time:nowTime(),tgl:today()});input.value='';renderChat();showToast('📎 File dilampirkan','ok');}
+function sendChat(){
+  const inp=document.getElementById('c-inp');const text=inp.value.trim();if(!text)return;
+  const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today()};
+  chatMessages.push(msg);inp.value='';renderChat();
+  fbPush('chat',msg);
+}
+function attachFile(input){if(!input.files||!input.files[0])return;const msg={id:Date.now(),user:currentUser.name,text:'Mengirim file:',file:input.files[0].name,time:nowTime(),tgl:today()};chatMessages.push(msg);input.value='';renderChat();fbPush('chat',msg);showToast('📎 File dilampirkan','ok');}
 
 // NOTIF
 function renderNP(){document.getElementById('np-list').innerHTML=notifList.map(n=>`<div class="np-item"><div class="np-dot" style="background:${n.color};"></div><div><div class="np-txt">${n.text}</div><div class="np-time">${n.time}</div></div></div>`).join('');}
@@ -1609,6 +1716,17 @@ document.getElementById('c-inp').addEventListener('keydown',e=>{if(e.key==='Ente
 document.getElementById('scroller').addEventListener('click',()=>document.getElementById('np').classList.remove('on'));
 // Load settings saat app pertama kali dibuka
 loadSettings();
+
+// Hide loading overlay once Firebase is ready (or fallback after 4s)
+function hideFbLoading(){
+  const el=document.getElementById('fb-loading');
+  if(el){el.classList.add('hide');setTimeout(()=>el.style.display='none',500);}
+}
+if(window._fbReady){hideFbLoading();}
+else{
+  document.addEventListener('firebase-ready',hideFbLoading);
+  setTimeout(hideFbLoading,4000); // fallback
+}
 </script>
 </body>
 </html>
