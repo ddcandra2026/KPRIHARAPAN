@@ -221,11 +221,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .c-time{font-size:.6rem;opacity:.55;margin-top:3px;display:block;}
 .c-file{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:3px 7px;font-size:.67rem;margin-top:4px;background:rgba(255,255,255,.18);}
 .c-file.ext{background:var(--pri-xl);color:var(--pri);}
-.chat-bar{background:#fff;border-top:1px solid var(--border);padding:8px 11px;display:none;align-items:flex-end;gap:6px;flex-shrink:0;}
+.chat-bar{background:#fff;border-top:1px solid var(--border);padding:8px 11px;display:none;align-items:flex-end;gap:6px;flex-shrink:0;position:sticky;bottom:0;z-index:49;}
 .chat-bar.on{display:flex;}
 .c-inp{flex:1;border:1.5px solid var(--border);border-radius:18px;padding:8px 11px;font-size:.81rem;font-family:inherit;outline:none;resize:none;max-height:80px;overflow-y:auto;}
 .c-inp:focus{border-color:var(--pri);}
-.c-send{width:34px;height:34px;background:var(--pri);border:none;border-radius:10px;color:#fff;font-size:.86rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.c-send{width:36px;height:36px;background:var(--pri);border:none;border-radius:50%;color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(15,76,129,.3);}
 .c-att{width:34px;height:34px;background:var(--bg);border:none;border-radius:10px;color:var(--muted);font-size:.86rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:.22s;backdrop-filter:blur(2px);}
 .ov.on{opacity:1;pointer-events:all;}
@@ -398,6 +398,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
         <div class="sec-row"><div class="card-t" style="margin:0">Aktivitas Terbaru</div><button class="btn btn-ghost btn-xs" onclick="goPage('transaksi')">Lihat →</button></div>
         <div id="tx-recent"></div>
       </div>
+      <div class="card" id="ann-beranda-card">
+        <div class="sec-row"><div class="card-t" style="margin:0">📢 Pengumuman Terbaru</div><button class="btn btn-ghost btn-xs" onclick="goPage('pengumuman')">Semua →</button></div>
+        <div id="ann-beranda"></div>
+      </div>
       <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
     <!-- TRANSAKSI -->
@@ -509,7 +513,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <!-- CHAT -->
     <div class="page" id="pg-chat">
       <div class="sec-t">💬 Forum Diskusi</div>
-      <div class="chat-area" id="chat-area"></div>
+      <div class="chat-area" id="chat-area" style="padding-bottom:4px;min-height:200px;"></div>
+      <div class="chat-bar on" id="chat-bar" style="position:sticky;bottom:74px;margin:0 -12px;padding:8px 12px;">
+        <input type="file" id="file-att" style="display:none" onchange="attachFile(this)">
+        <button class="c-att" onclick="document.getElementById('file-att').click()">📎</button>
+        <textarea class="c-inp" id="c-inp" rows="1" placeholder="Tulis pesan diskusi..."></textarea>
+        <button class="c-send" onclick="sendChat()">➤</button>
+      </div>
       <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
     <!-- PROFIL -->
@@ -623,12 +633,6 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       <div style="height:10px;"></div>
       <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
-  </div>
-  <div class="chat-bar" id="chat-bar">
-    <input type="file" id="file-att" style="display:none" onchange="attachFile(this)">
-    <button class="c-att" onclick="document.getElementById('file-att').click()">📎</button>
-    <textarea class="c-inp" id="c-inp" rows="1" placeholder="Tulis pesan..."></textarea>
-    <button class="c-send" onclick="sendChat()">➤</button>
   </div>
   <div class="bnav">
     <button class="bni on" onclick="goPage('beranda')"><div class="bni-ic">🏠</div><div class="bni-lb">Beranda</div><div class="bni-pip"></div></button>
@@ -824,89 +828,124 @@ let members=[];
 let transactions=[],announcements=[],chatMessages=[];
 let notifList=[];
 let currentUser=null,currentRole='anggota',txTypeSelected='D',charts={},ovaCurrentMemberId=null,passVisible=false;
-let _fbUnsubChat=null; // realtime chat listener
 
 // ========== FIREBASE SYNC HELPERS ==========
-function fbDb(){return window._fb?window._fb.db:null;}
-function fbRef(path){const {db,ref}=window._fb;return ref(db,path);}
 function fbSet(path,data){if(!window._fb)return Promise.resolve();const {db,ref,set}=window._fb;return set(ref(db,path),data);}
 function fbGet(path){if(!window._fb)return Promise.resolve(null);const {db,ref,get}=window._fb;return get(ref(db,path));}
-function fbPush(path,data){if(!window._fb)return;const {db,ref,push}=window._fb;return push(ref(db,path),data);}
-function fbRemove(path){if(!window._fb)return;const {db,ref,remove}=window._fb;return remove(ref(db,path));}
-function fbUpdate(path,data){if(!window._fb)return;const {db,ref,update}=window._fb;return update(ref(db,path),data);}
+function fbPush(path,data){if(!window._fb)return Promise.resolve();const {db,ref,push}=window._fb;return push(ref(db,path),data);}
 
-// Firebase stores arrays as objects with numeric keys — convert back to real arrays
+// Firebase turns arrays into {0:{},1:{}} — always convert back
 function toSafeArray(val){
   if(!val)return[];
   if(Array.isArray(val))return val;
-  // Firebase converts array to {0:{...},1:{...}} — convert back
   return Object.values(val);
 }
-
-// Sanitize a member object to ensure all array fields are real arrays
 function sanitizeMember(m){
-  if(!m)return m;
+  if(!m)return null;
   m.piutang=toSafeArray(m.piutang);
   m.riwayat=toSafeArray(m.riwayat);
   return m;
 }
 
-async function fbSaveMembers(){
-  // Save members: store as plain array (Firebase will store as object, but we convert back on load)
-  await fbSet('members', members.length ? members : null);
-}
-async function fbSaveTransactions(){await fbSet('transactions',transactions.length?transactions:null);}
-async function fbSaveAnnouncements(){await fbSet('announcements',announcements.length?announcements:null);}
-async function fbSaveUsers(){
-  await fbSet('users_db',USERS_DB);
-}
+// ---- WRITE helpers (fire & forget — UI already updated in memory) ----
+function fbSaveMembers(){fbSet('members',members.length?members:null);}
+function fbSaveTransactions(){fbSet('transactions',transactions.length?transactions:null);}
+function fbSaveAnnouncements(){fbSet('announcements',announcements.length?announcements:null);}
+function fbSaveUsers(){fbSet('users_db',USERS_DB);}
 
+// ---- ONE-TIME LOAD (used at login) ----
 async function loadDataFromFirebase(){
+  if(!window._fb)return;
   try{
     const [mSnap,tSnap,aSnap,uSnap]=await Promise.all([
       fbGet('members'),fbGet('transactions'),fbGet('announcements'),fbGet('users_db')
     ]);
-    // Convert Firebase object back to arrays and sanitize nested arrays
-    if(mSnap&&mSnap.exists()){
-      members = toSafeArray(mSnap.val()).map(sanitizeMember).filter(Boolean);
-    }
-    if(tSnap&&tSnap.exists()){
-      transactions = toSafeArray(tSnap.val()).filter(Boolean);
-    }
-    if(aSnap&&aSnap.exists()){
-      announcements = toSafeArray(aSnap.val()).filter(Boolean);
-    }
-    if(uSnap&&uSnap.exists()){
-      const remote=uSnap.val()||{};
-      USERS_DB={...USERS_DB,...remote};
-    }
+    if(mSnap&&mSnap.exists()) members=toSafeArray(mSnap.val()).map(sanitizeMember).filter(Boolean);
+    if(tSnap&&tSnap.exists()) transactions=toSafeArray(tSnap.val()).filter(Boolean);
+    if(aSnap&&aSnap.exists()) announcements=toSafeArray(aSnap.val()).filter(Boolean);
+    if(uSnap&&uSnap.exists()) USERS_DB={...USERS_DB,...(uSnap.val()||{})};
   }catch(e){
     console.warn('Firebase load error:',e);
-    showToast('⚠️ Gagal load data Firebase, mode offline','err');
+    showToast('⚠️ Gagal load data Firebase','err');
   }
 }
 
-function subscribeChat(){
+// ---- REALTIME LISTENERS (subscribed after login) ----
+let _unsubs=[];
+function unsubscribeAll(){_unsubs.forEach(fn=>fn());_unsubs=[];}
+
+function subscribeRealtime(){
   if(!window._fb)return;
-  if(_fbUnsubChat)_fbUnsubChat();
+  unsubscribeAll();
   const {db,ref,onValue}=window._fb;
-  _fbUnsubChat=onValue(ref(db,'chat'),snap=>{
-    if(snap.exists()){
-      const data=snap.val();
-      chatMessages=toSafeArray(data).filter(Boolean);
-      chatMessages.sort((a,b)=>(a.id||0)-(b.id||0));
-      if(document.getElementById('pg-chat')&&document.getElementById('pg-chat').classList.contains('on')){
-        renderChat();
-      } else {
-        document.getElementById('chat-badge').style.display='';
-      }
+
+  // MEMBERS — live sync
+  _unsubs.push(onValue(ref(db,'members'),snap=>{
+    const raw=snap.exists()?snap.val():null;
+    members=toSafeArray(raw).map(sanitizeMember).filter(Boolean);
+    // Re-render affected views
+    if(isPageActive('beranda'))renderBeranda();
+    if(isPageActive('anggota'))renderMembers('');
+    refreshKKSelect();
+    const sel=document.getElementById('tx-anggota');
+    if(sel)sel.innerHTML='<option value="Semua">Semua Anggota</option>'+members.map(m=>`<option value="${m.nama}">${m.nama}</option>`).join('');
+  }));
+
+  // TRANSACTIONS — live sync
+  _unsubs.push(onValue(ref(db,'transactions'),snap=>{
+    const raw=snap.exists()?snap.val():null;
+    transactions=toSafeArray(raw).filter(Boolean);
+    if(isPageActive('beranda'))renderBeranda();
+    if(isPageActive('transaksi'))renderTx('all');
+    if(isPageActive('laporan'))renderLaporan();
+  }));
+
+  // ANNOUNCEMENTS — live sync
+  let _lastAnnCount=0;
+  _unsubs.push(onValue(ref(db,'announcements'),snap=>{
+    const raw=snap.exists()?snap.val():null;
+    const incoming=toSafeArray(raw).filter(Boolean);
+    const isNew=incoming.length>_lastAnnCount&&_lastAnnCount>0;
+    _lastAnnCount=incoming.length;
+    announcements=incoming;
+    if(isNew&&incoming.length){
+      const latest=incoming[0];
+      notifList.unshift({text:`📢 ${latest.judul}`,time:'Baru saja',color:'var(--pri)'});
+      document.querySelector('.ndot') && (document.querySelector('.ndot').style.display='');
     }
-  });
+    if(isPageActive('pengumuman'))renderAnn();
+    renderBeranda();
+    renderNP();
+  }));
+
+  // USERS_DB — live sync (password changes, new accounts)
+  _unsubs.push(onValue(ref(db,'users_db'),snap=>{
+    if(snap.exists()) USERS_DB={...USERS_DB,...(snap.val()||{})};
+  }));
+
+  // CHAT — live sync + badge
+  _unsubs.push(onValue(ref(db,'chat'),snap=>{
+    const raw=snap.exists()?snap.val():null;
+    const incoming=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
+    const hadNew=incoming.length>chatMessages.length;
+    chatMessages=incoming;
+    if(isPageActive('chat')){
+      renderChat();
+    } else if(hadNew && currentUser){
+      document.getElementById('chat-badge').style.display='';
+    }
+  }));
+}
+
+function isPageActive(page){
+  const el=document.getElementById('pg-'+page);
+  return el&&el.classList.contains('on');
 }
 // ========== END FIREBASE SYNC HELPERS ==========
 
 
 // HELPERS
+const priMap={info:{lbl:'ℹ️ Informasi',cls:'b-inf'},penting:{lbl:'⚠️ Penting',cls:'b-acc'},urgent:{lbl:'🚨 Urgent',cls:'b-err'}};
 function fmtRp(n){return'Rp '+(+n||0).toLocaleString('id-ID');}
 function fmtShort(n){n=+(n||0);if(n>=1e9)return'Rp '+(n/1e9).toFixed(1)+'M';if(n>=1e6)return'Rp '+(n/1e6).toFixed(1)+'Jt';if(n>=1e3)return'Rp '+(n/1e3).toFixed(0)+'Rb';return fmtRp(n);}
 function fmtDate(d){if(!d)return'—';const dt=new Date(d);return`${dt.getDate()} ${BULAN[dt.getMonth()]} ${dt.getFullYear()}`;}
@@ -955,10 +994,10 @@ async function doLogin(){
   document.getElementById('splash').classList.add('hide');
   document.getElementById('app').classList.add('on');
   setupRole();renderAll();
-  subscribeChat();
+  subscribeRealtime();
   setTimeout(()=>document.getElementById('splash').style.display='none',600);
 }
-function doLogout(){location.reload();}
+function doLogout(){unsubscribeAll();location.reload();}
 async function manualRefresh(){
   const btn=document.getElementById('btn-refresh');
   if(btn){btn.textContent='⏳';btn.disabled=true;}
@@ -994,8 +1033,10 @@ function goPage(page){
   document.getElementById('scroller').scrollTop=0;
   const navIdx={beranda:0,transaksi:1,anggota:2,laporan:3,chat:4};
   const idx=navIdx[page];if(idx!==undefined)document.querySelectorAll('.bni')[idx].classList.add('on');
-  document.getElementById('chat-bar').className='chat-bar'+(page==='chat'?' on':'');
-  if(page==='chat')document.getElementById('chat-badge').style.display='none';
+  if(page==='chat'){
+    document.getElementById('chat-badge').style.display='none';
+    setTimeout(()=>{const s=document.getElementById('scroller');s.scrollTop=s.scrollHeight;},80);
+  }
   const map={transaksi:()=>renderTx('all'),anggota:()=>renderMembers(''),laporan:renderLaporan,pengumuman:renderAnn,chat:renderChat,simpanan:renderSimpanan,pinjaman:renderPinjaman,profil:renderProfil,pengaturan:renderPengaturan};
   if(map[page])map[page]();
 }
@@ -1044,6 +1085,28 @@ function renderBeranda(){
   document.getElementById('s-piutang').textContent=fmtShort(members.reduce((s,m)=>s+getMemberTotals(m).sisa_piutang,0));
   const myTx=currentUser.role==='anggota'?transactions.filter(t=>t.anggota===currentUser.name||t.anggota==='Semua'):[...transactions];
   document.getElementById('tx-recent').innerHTML=myTx.length?renderTxItems(myTx.slice(0,5)):'<div class="empty"><div class="empty-ico">📭</div><div class="empty-txt">Belum ada aktivitas. Pengurus dapat mencatat transaksi melalui menu Transaksi atau dari detail Anggota.</div></div>';
+  // Pengumuman terbaru di beranda
+  const annEl=document.getElementById('ann-beranda');
+  const annCard=document.getElementById('ann-beranda-card');
+  if(annEl){
+    const top3=announcements.slice(0,3);
+    if(!top3.length){
+      if(annCard)annCard.style.display='none';
+    } else {
+      if(annCard)annCard.style.display='';
+      annEl.innerHTML=top3.map(a=>{
+        const pm=priMap[a.prioritas]||priMap.info;
+        return`<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+            <span class="badge ${pm.cls}" style="font-size:.58rem;">${pm.lbl}</span>
+            <span style="font-size:.78rem;font-weight:800;">${a.judul}</span>
+          </div>
+          <div style="font-size:.72rem;color:var(--muted);line-height:1.5;">${a.isi.length>80?a.isi.substring(0,80)+'…':a.isi}</div>
+          <div style="font-size:.63rem;color:var(--muted);margin-top:3px;">👤 ${a.author} · ${fmtDate(a.tgl)}</div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 // TX
@@ -1400,7 +1463,6 @@ function downloadRK(){
 }
 
 // PENGUMUMAN
-const priMap={info:{lbl:'ℹ️ Informasi',cls:'b-inf'},penting:{lbl:'⚠️ Penting',cls:'b-acc'},urgent:{lbl:'🚨 Urgent',cls:'b-err'}};
 function renderAnn(){
   if(!announcements.length){document.getElementById('ann-list').innerHTML='<div class="empty"><div class="empty-ico">📢</div><div class="empty-txt">Belum ada pengumuman</div></div>';return;}
   document.getElementById('ann-list').innerHTML=announcements.map(a=>`<div class="ann ${a.prioritas}"><span class="badge ${priMap[a.prioritas].cls}">${priMap[a.prioritas].lbl}</span><div class="ann-title">${a.judul}</div><div class="ann-body">${a.isi}</div><div class="ann-foot"><div class="ann-meta">👤 ${a.author} · ${fmtDate(a.tgl)}</div>${currentUser.role==='pengurus'?`<button class="btn btn-err btn-xs" onclick="delAnn(${a.id})">🗑️</button>`:''}</div></div>`).join('');
@@ -1417,17 +1479,34 @@ function delAnn(id){if(!confirm('Hapus pengumuman ini?'))return;announcements=an
 // CHAT
 function renderChat(){
   const el=document.getElementById('chat-area');
-  if(!chatMessages.length){el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-txt">Belum ada pesan. Mulai diskusi!</div></div>';return;}
-  el.innerHTML=chatMessages.map(m=>{const mine=m.user===currentUser.name;return`<div class="cm ${mine?'me':''}"><div class="c-ava">${m.user.charAt(0)}</div><div class="c-wrap"><div class="c-sender">${m.user} · ${m.time}</div><div class="c-bub"><div class="c-text">${m.text}</div>${m.file?`<div class="c-file ${mine?'':'ext'}">📎 ${m.file}</div>`:''}<span class="c-time">${fmtDate(m.tgl)}</span></div></div></div>`;}).join('');
-  setTimeout(()=>document.getElementById('scroller').scrollTop=99999,60);
+  if(!el)return;
+  if(!chatMessages.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-txt">Belum ada pesan. Mulai diskusi!</div></div>';
+    return;
+  }
+  el.innerHTML=chatMessages.map(m=>{
+    const mine=currentUser&&m.user===currentUser.name;
+    return`<div class="cm ${mine?'me':''}"><div class="c-ava">${(m.user||'?').charAt(0).toUpperCase()}</div><div class="c-wrap"><div class="c-sender">${m.user} · ${m.time}</div><div class="c-bub"><div class="c-text">${m.text}</div>${m.file?`<div class="c-file ${mine?'':'ext'}">📎 ${m.file}</div>`:''}<span class="c-time">${fmtDate(m.tgl)}</span></div></div></div>`;
+  }).join('');
+  // Scroll to bottom of scroller
+  setTimeout(()=>{const s=document.getElementById('scroller');if(s)s.scrollTop=s.scrollHeight;},80);
 }
 function sendChat(){
-  const inp=document.getElementById('c-inp');const text=inp.value.trim();if(!text)return;
+  const inp=document.getElementById('c-inp');
+  if(!inp)return;
+  const text=inp.value.trim();
+  if(!text)return;
   const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today()};
-  chatMessages.push(msg);inp.value='';renderChat();
-  fbPush('chat',msg);
+  inp.value='';inp.style.height='auto';
+  fbPush('chat',msg); // Firebase listener will update chatMessages and re-render
 }
-function attachFile(input){if(!input.files||!input.files[0])return;const msg={id:Date.now(),user:currentUser.name,text:'Mengirim file:',file:input.files[0].name,time:nowTime(),tgl:today()};chatMessages.push(msg);input.value='';renderChat();fbPush('chat',msg);showToast('📎 File dilampirkan','ok');}
+function attachFile(input){
+  if(!input.files||!input.files[0])return;
+  const msg={id:Date.now(),user:currentUser.name,text:'Mengirim file:',file:input.files[0].name,time:nowTime(),tgl:today()};
+  input.value='';
+  fbPush('chat',msg);
+  showToast('📎 File dilampirkan','ok');
+}
 
 // NOTIF
 function renderNP(){document.getElementById('np-list').innerHTML=notifList.map(n=>`<div class="np-item"><div class="np-dot" style="background:${n.color};"></div><div><div class="np-txt">${n.text}</div><div class="np-time">${n.time}</div></div></div>`).join('');}
@@ -1748,7 +1827,10 @@ function buildCLap(){
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('app').classList.contains('on'))doLogin();});
-document.getElementById('c-inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
+// Use event delegation for c-inp since it's inside pg-chat
+document.addEventListener('keydown',e=>{
+  if(e.target&&e.target.id==='c-inp'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}
+});
 document.getElementById('scroller').addEventListener('click',()=>document.getElementById('np').classList.remove('on'));
 // Load settings saat app pertama kali dibuka
 loadSettings();
