@@ -81,7 +81,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 #app.on{display:flex;}
 .topbar{background:linear-gradient(135deg,var(--pri-d),var(--pri));padding:12px 15px 11px;flex-shrink:0;z-index:50;}
 .tb-row{display:flex;align-items:center;justify-content:space-between;}
-.tb-brand{font-family:'DM Sans',sans-serif;font-size:1rem;color:#fff;font-weight:900;}
+.tb-brand{font-family:'DM Sans',sans-serif;font-size:1rem;color:#fff;font-weight:900;display:flex;align-items:center;gap:8px;}
+#tb-logo-wrap{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.15);flex-shrink:0;}
+#tb-logo-wrap img{width:100%;height:100%;object-fit:cover;border-radius:7px;}
+#tb-logo-wrap span{font-size:1.3rem;}
 .tb-greet{font-size:.69rem;color:rgba(255,255,255,.6);margin-top:1px;}
 .tb-name{color:rgba(255,255,255,.95);font-weight:800;}
 .tb-acts{display:flex;gap:6px;}
@@ -351,7 +354,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
   <div class="topbar">
     <div class="tb-row">
       <div>
-        <div class="tb-brand" id="tb-brand-text"><span id="tb-logo-wrap">🏦 </span><span id="tb-title-text">KPRI Harapan</span></div>
+        <div class="tb-brand" id="tb-brand-text"><div id="tb-logo-wrap"><span id="tb-logo-icon">🏦</span></div><span id="tb-title-text">KPRI Harapan</span></div>
         <div class="tb-greet">Selamat datang, <span class="tb-name" id="tb-name">—</span>
           &nbsp;<span class="badge b-acc" id="tb-rbadge" style="font-size:.59rem;padding:1px 6px;">Anggota</span>
         </div>
@@ -378,7 +381,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
         <div class="hero-chips">
           <div class="hchip"><div class="hchip-l">Sisa Piutang</div><div class="hchip-v" id="h-piutang">—</div></div>
           <div class="hchip"><div class="hchip-l">Angs/Bln</div><div class="hchip-v" id="h-angsuran">—</div></div>
-          <div class="hchip"><div class="hchip-l">Iuran/Bln</div><div class="hchip-v">Rp 250.000</div></div>
+          <div class="hchip"><div class="hchip-l">Iuran/Bln</div><div class="hchip-v" id="h-iuran">—</div></div>
         </div>
       </div>
       <div class="tagihan" id="tagihan-box">
@@ -484,9 +487,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
     </div>
     <!-- ANGGOTA -->
     <div class="page" id="pg-anggota">
-      <div class="sec-row"><div class="sec-t" style="margin:0">👥 Data Anggota</div><button class="btn btn-pri btn-sm" id="btn-add-member" onclick="openAddMember()">+ Tambah</button></div>
+      <div class="sec-row"><div class="sec-t" id="anggota-page-title" style="margin:0">👥 Data Anggota</div><button class="btn btn-pri btn-sm" id="btn-add-member" onclick="openAddMember()">+ Tambah</button></div>
       <div class="info-box" id="info-pengurus" style="display:none;">💡 <b>Panduan Pengurus:</b> Klik kartu anggota untuk mengelola data simpan-pinjam, riwayat aktivitas, dan akun login anggota.</div>
-      <input class="fi" style="margin-bottom:10px;" placeholder="🔍 Cari nama / ID anggota..." oninput="searchMember(this.value)">
+      <div id="anggota-search-wrap"><input class="fi" style="margin-bottom:10px;" placeholder="🔍 Cari nama / ID anggota..." oninput="searchMember(this.value)"></div>
       <div id="member-list"></div>
       <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
@@ -654,7 +657,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
   <div class="bnav">
     <button class="bni on" onclick="goPage('beranda')"><div class="bni-ic">🏠</div><div class="bni-lb">Beranda</div><div class="bni-pip"></div></button>
     <button class="bni" onclick="goPage('transaksi')"><div class="bni-ic">💳</div><div class="bni-lb">Transaksi</div><div class="bni-pip"></div></button>
-    <button class="bni" onclick="goPage('anggota')"><div class="bni-ic">👥</div><div class="bni-lb">Anggota</div><div class="bni-pip"></div></button>
+    <button class="bni" onclick="goPage('anggota')"><div class="bni-ic">👥</div><div class="bni-lb" id="nav-anggota-lbl">Anggota</div><div class="bni-pip"></div></button>
     <button class="bni" onclick="goPage('laporan')"><div class="bni-ic">📊</div><div class="bni-lb">Laporan</div><div class="bni-pip"></div></button>
     <button class="bni" onclick="goPage('chat')"><div class="bni-ic">💬</div><div class="bni-lb">Chat</div><div class="bni-badge" id="chat-badge" style="display:none;">!</div><div class="bni-pip"></div></button>
   </div>
@@ -1010,23 +1013,40 @@ function toggleLoginPass(){
   else{inp.type='password';btn.textContent='👁️';}
 }
 // AUTH
+const SESSION_KEY='kpri_session';
+function saveSession(page){
+  sessionStorage.setItem(SESSION_KEY,JSON.stringify({
+    username:currentUser.username,
+    pass:currentUser.pass,
+    role:currentUser.role,
+    page:page||'beranda'
+  }));
+}
+function clearSession(){sessionStorage.removeItem(SESSION_KEY);}
+
 function setRole(r,el){currentRole=r;document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
-async function doLogin(){
-  const u=document.getElementById('l-user').value.trim().toLowerCase();
-  const p=document.getElementById('l-pass').value;
+
+async function doLogin(restoredUser, restoredPage){
+  let u,p;
+  if(restoredUser){
+    // Auto-restore from session
+    u=restoredUser.username; p=restoredUser.pass; currentRole=restoredUser.role;
+  } else {
+    u=document.getElementById('l-user').value.trim().toLowerCase();
+    p=document.getElementById('l-pass').value;
+    const err=document.getElementById('l-err');
+    if(!u||!p){err.textContent='❌ Username dan password wajib diisi';return;}
+  }
   const err=document.getElementById('l-err');
-  if(!u||!p){err.textContent='❌ Username dan password wajib diisi';return;}
-  // Show loading
-  const lbtn=document.querySelector('.lbtn');if(lbtn){lbtn.disabled=true;lbtn.textContent='Memuat data...';}
-  try{
-    await loadDataFromFirebase();
-  }catch(e){}
+  const lbtn=document.querySelector('.lbtn');
+  if(lbtn){lbtn.disabled=true;lbtn.textContent='Memuat data...';}
+  try{ await loadDataFromFirebase(); }catch(e){}
   if(lbtn){lbtn.disabled=false;lbtn.textContent='🚀 Masuk ke Sistem';}
   const data=USERS_DB[u];
-  if(!data){err.textContent='❌ Username tidak ditemukan';return;}
-  if(data.pass!==p){err.textContent='❌ Password salah';return;}
-  if(currentRole==='pengurus'&&data.role!=='pengurus'){err.textContent='❌ Akun ini bukan Pengurus';return;}
-  if(currentRole==='anggota'&&data.role==='pengurus'){err.textContent='❌ Silakan pilih role Pengurus';return;}
+  if(!data){if(err)err.textContent='❌ Username tidak ditemukan';clearSession();return;}
+  if(data.pass!==p){if(err)err.textContent='❌ Password salah';clearSession();return;}
+  if(currentRole==='pengurus'&&data.role!=='pengurus'){if(err)err.textContent='❌ Akun ini bukan Pengurus';return;}
+  if(currentRole==='anggota'&&data.role==='pengurus'){if(err)err.textContent='❌ Silakan pilih role Pengurus';return;}
   const m=data.memberKey?members.find(x=>x.id===data.memberKey):null;
   currentUser={...data,username:u,name:m?m.nama:'Admin Koperasi'};
   USERS_DB[u].lastLogin=fmtDate(today())+' '+nowTime();
@@ -1039,9 +1059,16 @@ async function doLogin(){
   document.getElementById('app').classList.add('on');
   setupRole();renderAll();
   subscribeRealtime();
+  // Save session & restore last page
+  saveSession(restoredPage||'beranda');
+  const targetPage=restoredPage||'beranda';
+  if(targetPage!=='beranda')setTimeout(()=>goPage(targetPage),200);
   setTimeout(()=>document.getElementById('splash').style.display='none',600);
 }
-function doLogout(){unsubscribeAll();location.reload();}
+
+function doLogout(){unsubscribeAll();clearSession();location.reload();}
+
+
 async function manualRefresh(){
   const btn=document.getElementById('btn-refresh');
   if(btn){btn.textContent='⏳';btn.disabled=true;}
@@ -1060,6 +1087,13 @@ function setupRole(){
   ['btn-add-tx','btn-add-member','mi-tambah','btn-add-ann'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isP?'':'none';});
   document.getElementById('input-kekayaan-section').style.display=isP?'block':'none';
   document.getElementById('info-pengurus').style.display=isP?'block':'none';
+  // Anggota page — hide search & title for non-pengurus
+  const searchWrap=document.getElementById('anggota-search-wrap');
+  const pageTitle=document.getElementById('anggota-page-title');
+  if(searchWrap)searchWrap.style.display=isP?'block':'none';
+  if(pageTitle)pageTitle.textContent=isP?'👥 Data Anggota':'📋 Data Saya';
+  const navLbl=document.getElementById('nav-anggota-lbl');
+  if(navLbl)navLbl.textContent=isP?'Anggota':'Data Saya';
   const sel=document.getElementById('tx-anggota');
   sel.innerHTML='<option value="Semua">Semua Anggota</option>'+members.map(m=>`<option value="${m.nama}">${m.nama}</option>`).join('');
   refreshKKSelect();
@@ -1074,16 +1108,17 @@ function goPage(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.bni').forEach(b=>b.classList.remove('on'));
   document.getElementById('pg-'+page).classList.add('on');
-  // Chat has its own scroll — don't reset scroller for it
   if(page!=='chat') document.getElementById('scroller').scrollTop=0;
   const navIdx={beranda:0,transaksi:1,anggota:2,laporan:3,chat:4};
   const idx=navIdx[page];if(idx!==undefined)document.querySelectorAll('.bni')[idx].classList.add('on');
   if(page==='chat'){
     document.getElementById('chat-badge').style.display='none';
-    renderChat(); // render first, then scroll
+    renderChat();
   }
   const map={transaksi:()=>renderTx('all'),anggota:()=>renderMembers(''),laporan:renderLaporan,pengumuman:renderAnn,chat:()=>{},simpanan:renderSimpanan,pinjaman:renderPinjaman,profil:renderProfil,pengaturan:renderPengaturan};
   if(map[page])map[page]();
+  // Save page to session
+  if(currentUser)saveSession(page);
 }
 
 function renderAll(){renderBeranda();renderNP();buildCharts();}
@@ -1106,6 +1141,7 @@ function renderBeranda(){
     document.getElementById('h-kekayaan').textContent=fmtRp(tot.kekayaan);
     document.getElementById('h-piutang').textContent=fmtShort(tot.sisa_piutang);
     document.getElementById('h-angsuran').textContent=fmtShort(tot.total_angs);
+    document.getElementById('h-iuran').textContent=m.iuran_wajib?fmtShort(m.iuran_wajib):'—';
     document.getElementById('tag-angs').textContent=fmtRp(tot.total_angs);
     // Iuran wajib bulan ini
     const iuranWajib=m.iuran_wajib||0;
@@ -1264,8 +1300,21 @@ function renderPinjaman(){
 
 // ANGGOTA
 function renderMembers(q){
-  let list=q?members.filter(m=>m.nama.toLowerCase().includes(q.toLowerCase())||m.id.toLowerCase().includes(q.toLowerCase())):members;
-  if(!list.length){document.getElementById('member-list').innerHTML='<div class="empty"><div class="empty-ico">👤</div><div class="empty-txt">Tidak ditemukan</div></div>';return;}
+  const isP=currentUser.role==='pengurus';
+  // Anggota hanya bisa lihat data diri sendiri
+  let list=isP
+    ?(q?members.filter(m=>m.nama.toLowerCase().includes(q.toLowerCase())||m.id.toLowerCase().includes(q.toLowerCase())):members)
+    :members.filter(m=>m.id===currentUser.memberKey);
+  if(!list.length){
+    document.getElementById('member-list').innerHTML='<div class="empty"><div class="empty-ico">👤</div><div class="empty-txt">'+(isP?'Tidak ditemukan':'Data anggota belum tersedia')+'</div></div>';
+    return;
+  }
+  // Anggota - langsung buka detail dirinya
+  if(!isP&&list.length===1){
+    document.getElementById('member-list').innerHTML='';
+    openMember(list[0].id);
+    return;
+  }
   document.getElementById('member-list').innerHTML=list.map(m=>{
     const tot=getMemberTotals(m);
     return`<div class="mc" onclick="openMember('${m.id}')">
@@ -1739,10 +1788,10 @@ function applyLogoToUI(base64){
     splashWrap.innerHTML = `<img src="${base64}" class="sp-logo-img" alt="Logo" id="sp-logo-img">`;
   }
 
-  // 2. Topbar — tambahkan logo kecil
+  // 2. Topbar — logo proper sized in box
   const tbLogoWrap = document.getElementById('tb-logo-wrap');
   if(tbLogoWrap){
-    tbLogoWrap.innerHTML = `<img src="${base64}" class="tb-logo-img" alt="Logo"> `;
+    tbLogoWrap.innerHTML = `<img src="${base64}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;" alt="Logo">`;
   }
 
   // 3. Preview di halaman pengaturan
@@ -1986,6 +2035,19 @@ document.getElementById('scroller').addEventListener('click',()=>{
 });
 // Load settings saat app pertama kali dibuka
 loadSettings();
+
+// Auto-restore session on refresh
+(function restoreSession(){
+  try{
+    const s=sessionStorage.getItem(SESSION_KEY);
+    if(!s)return;
+    const sess=JSON.parse(s);
+    if(sess&&sess.username&&sess.pass){
+      // Auto-login with saved session
+      doLogin(sess, sess.page||'beranda');
+    }
+  }catch(e){clearSession();}
+})();
 
 // Hide loading overlay once Firebase is ready (or fallback after 4s)
 function hideFbLoading(){
