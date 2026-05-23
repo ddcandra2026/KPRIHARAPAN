@@ -109,6 +109,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .bni-badge{position:absolute;top:4px;right:calc(50% - 14px);background:var(--err);color:#fff;font-size:.54rem;font-weight:900;min-width:14px;height:14px;border-radius:7px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid #fff;}
 .page{display:none;padding:13px 12px calc(74px + env(safe-area-inset-bottom));min-height:100%;}
 .page.on{display:block;animation:fu .22s ease;}
+/* Chat page overrides - uses flex column with own scroll */
+#pg-chat.on{display:flex;padding:0;min-height:0;height:calc(100dvh - 57px - 58px);/* topbar + bnav */}
+.chat-area{display:flex;flex-direction:column;gap:9px;}
+.chat-bar{background:#fff;border-top:1.5px solid var(--border);padding:8px 12px;display:none;align-items:flex-end;gap:8px;flex-shrink:0;}
+.chat-bar.on{display:flex;}
 .card{background:var(--card);border-radius:14px;padding:14px;box-shadow:var(--sh);margin-bottom:10px;}
 .card-t{font-size:.69rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px;}
 .sec-t{font-family:'DM Sans',sans-serif;font-size:.91rem;font-weight:900;color:var(--text);margin-bottom:9px;}
@@ -221,7 +226,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .ann-body{font-size:.77rem;color:var(--muted);line-height:1.6;}
 .ann-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
 .ann-meta{font-size:.67rem;color:var(--muted);}
-.chat-area{display:flex;flex-direction:column;gap:9px;padding-bottom:9px;}
 .cm{display:flex;gap:7px;align-items:flex-end;}
 .cm.me{flex-direction:row-reverse;}
 .c-ava{width:27px;height:27px;border-radius:8px;background:var(--pri);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:800;flex-shrink:0;}
@@ -234,8 +238,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .c-time{font-size:.6rem;opacity:.55;margin-top:3px;display:block;}
 .c-file{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:3px 7px;font-size:.67rem;margin-top:4px;background:rgba(255,255,255,.18);}
 .c-file.ext{background:var(--pri-xl);color:var(--pri);}
-.chat-bar{background:#fff;border-top:1px solid var(--border);padding:8px 11px;display:none;align-items:flex-end;gap:6px;flex-shrink:0;position:sticky;bottom:0;z-index:49;}
-.chat-bar.on{display:flex;}
 .c-inp{flex:1;border:1.5px solid var(--border);border-radius:18px;padding:8px 11px;font-size:.81rem;font-family:inherit;outline:none;resize:none;max-height:80px;overflow-y:auto;}
 .c-inp:focus{border-color:var(--pri);}
 .c-send{width:36px;height:36px;background:var(--pri);border:none;border-radius:50%;color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(15,76,129,.3);}
@@ -526,16 +528,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
       <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
     <!-- CHAT -->
-    <div class="page" id="pg-chat">
-      <div class="sec-t">💬 Forum Diskusi</div>
-      <div class="chat-area" id="chat-area" style="padding-bottom:4px;min-height:200px;"></div>
-      <div class="chat-bar on" id="chat-bar" style="position:sticky;bottom:74px;margin:0 -12px;padding:8px 12px;">
+    <div class="page" id="pg-chat" style="display:none;flex-direction:column;padding:0;height:100%;overflow:hidden;">
+      <div class="sec-t" style="padding:14px 12px 8px;flex-shrink:0;margin:0;">💬 Forum Diskusi</div>
+      <div class="chat-area" id="chat-area" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px 8px;-webkit-overflow-scrolling:touch;"></div>
+      <div class="chat-bar on" id="chat-bar" style="margin:0;border-radius:0;">
         <input type="file" id="file-att" style="display:none" onchange="attachFile(this)">
         <button class="c-att" onclick="document.getElementById('file-att').click()">📎</button>
         <textarea class="c-inp" id="c-inp" rows="1" placeholder="Tulis pesan diskusi..."></textarea>
         <button class="c-send" onclick="sendChat()">➤</button>
       </div>
-      <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
+      <div class="wm" style="flex-shrink:0;padding-bottom:6px;">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
     <!-- PROFIL -->
     <div class="page" id="pg-profil">
@@ -971,9 +973,10 @@ function subscribeRealtime(){
     const hadNew=incoming.length>chatMessages.length;
     chatMessages=incoming;
     if(isPageActive('chat')){
-      renderChat();
+      renderChat(); // renderChat already scrolls to bottom
     } else if(hadNew && currentUser){
-      document.getElementById('chat-badge').style.display='';
+      const badge=document.getElementById('chat-badge');
+      if(badge)badge.style.display='';
     }
   }));
 }
@@ -1071,14 +1074,15 @@ function goPage(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.bni').forEach(b=>b.classList.remove('on'));
   document.getElementById('pg-'+page).classList.add('on');
-  document.getElementById('scroller').scrollTop=0;
+  // Chat has its own scroll — don't reset scroller for it
+  if(page!=='chat') document.getElementById('scroller').scrollTop=0;
   const navIdx={beranda:0,transaksi:1,anggota:2,laporan:3,chat:4};
   const idx=navIdx[page];if(idx!==undefined)document.querySelectorAll('.bni')[idx].classList.add('on');
   if(page==='chat'){
     document.getElementById('chat-badge').style.display='none';
-    setTimeout(()=>{const s=document.getElementById('scroller');s.scrollTop=s.scrollHeight;},80);
+    renderChat(); // render first, then scroll
   }
-  const map={transaksi:()=>renderTx('all'),anggota:()=>renderMembers(''),laporan:renderLaporan,pengumuman:renderAnn,chat:renderChat,simpanan:renderSimpanan,pinjaman:renderPinjaman,profil:renderProfil,pengaturan:renderPengaturan};
+  const map={transaksi:()=>renderTx('all'),anggota:()=>renderMembers(''),laporan:renderLaporan,pengumuman:renderAnn,chat:()=>{},simpanan:renderSimpanan,pinjaman:renderPinjaman,profil:renderProfil,pengaturan:renderPengaturan};
   if(map[page])map[page]();
 }
 
@@ -1574,6 +1578,12 @@ function saveAnn(){
 function delAnn(id){if(!confirm('Hapus pengumuman ini?'))return;announcements=announcements.filter(a=>a.id!==id);renderAnn();fbSaveAnnouncements();showToast('🗑️ Dihapus');}
 
 // CHAT
+function scrollChatToBottom(smooth){
+  const el=document.getElementById('chat-area');
+  if(!el)return;
+  setTimeout(()=>el.scrollTo({top:el.scrollHeight,behavior:smooth?'smooth':'instant'}),60);
+}
+
 function renderChat(){
   const el=document.getElementById('chat-area');
   if(!el)return;
@@ -1581,13 +1591,27 @@ function renderChat(){
     el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-txt">Belum ada pesan. Mulai diskusi!</div></div>';
     return;
   }
-  el.innerHTML=chatMessages.map(m=>{
+  // Always sort oldest → newest (ascending) so oldest is at top
+  const sorted=[...chatMessages].sort((a,b)=>(a.id||0)-(b.id||0));
+  const wasAtBottom=el.scrollHeight-el.scrollTop-el.clientHeight<60;
+  el.innerHTML=sorted.map(m=>{
     const mine=currentUser&&m.user===currentUser.name;
-    return`<div class="cm ${mine?'me':''}"><div class="c-ava">${(m.user||'?').charAt(0).toUpperCase()}</div><div class="c-wrap"><div class="c-sender">${m.user} · ${m.time}</div><div class="c-bub"><div class="c-text">${m.text}</div>${m.file?`<div class="c-file ${mine?'':'ext'}">📎 ${m.file}</div>`:''}<span class="c-time">${fmtDate(m.tgl)}</span></div></div></div>`;
+    return`<div class="cm ${mine?'me':''}">
+      <div class="c-ava">${(m.user||'?').charAt(0).toUpperCase()}</div>
+      <div class="c-wrap">
+        <div class="c-sender">${m.user} · ${m.time}</div>
+        <div class="c-bub">
+          <div class="c-text">${m.text}</div>
+          ${m.file?`<div class="c-file ${mine?'':'ext'}">📎 ${m.file}</div>`:''}
+          <span class="c-time">${fmtDate(m.tgl)}</span>
+        </div>
+      </div>
+    </div>`;
   }).join('');
-  // Scroll to bottom of scroller
-  setTimeout(()=>{const s=document.getElementById('scroller');if(s)s.scrollTop=s.scrollHeight;},80);
+  // Scroll to bottom: always on first load, or if was already near bottom
+  scrollChatToBottom(false);
 }
+
 function sendChat(){
   const inp=document.getElementById('c-inp');
   if(!inp)return;
@@ -1595,7 +1619,9 @@ function sendChat(){
   if(!text)return;
   const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today()};
   inp.value='';inp.style.height='auto';
-  fbPush('chat',msg); // Firebase listener will update chatMessages and re-render
+  fbPush('chat',msg);
+  // Optimistic scroll down immediately
+  setTimeout(()=>scrollChatToBottom(true),50);
 }
 function attachFile(input){
   if(!input.files||!input.files[0])return;
@@ -1943,7 +1969,21 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElement
 document.addEventListener('keydown',e=>{
   if(e.target&&e.target.id==='c-inp'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}
 });
-document.getElementById('scroller').addEventListener('click',()=>document.getElementById('np').classList.remove('on'));
+// Auto-resize textarea
+document.addEventListener('input',e=>{
+  if(e.target&&e.target.id==='c-inp'){
+    e.target.style.height='auto';
+    e.target.style.height=Math.min(e.target.scrollHeight,100)+'px';
+  }
+});
+document.getElementById('scroller').addEventListener('click',()=>{
+  const np=document.getElementById('np');
+  if(np&&np.classList.contains('on')){
+    np.classList.remove('on');
+    const ov=document.getElementById('np-overlay');
+    if(ov)ov.style.display='none';
+  }
+});
 // Load settings saat app pertama kali dibuka
 loadSettings();
 
