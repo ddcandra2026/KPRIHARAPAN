@@ -574,7 +574,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
           <div style="font-family:'DM Sans',sans-serif;font-size:1.5rem;font-weight:900;color:var(--pri);" id="iuran-detail-current">Belum diatur</div>
         </div>
         <label class="fl" style="margin-bottom:5px;display:block;">Nominal Iuran Baru (Rp)</label>
-        <input type="text" inputmode="numeric" class="fi fi-nominal" id="iuran-detail-input" placeholder="Contoh: 150000" min="0" style="font-size:.95rem;font-weight:700;margin-bottom:6px;">
+        <div id="iuran-value-warning" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:7px 10px;font-size:.7rem;color:#92400e;margin-bottom:7px;">⚠️ Nilai saat ini terlihat terlalu kecil. Contoh benar: ketik <b>250.000</b> bukan <b>250</b>. Silakan perbaiki.</div>
+        <input type="text" inputmode="numeric" class="fi fi-nominal" id="iuran-detail-input" placeholder="Contoh: 150.000" min="0" style="font-size:.95rem;font-weight:700;margin-bottom:6px;">
         <div style="font-size:.68rem;color:var(--muted);margin-bottom:14px;">Isi 0 atau kosongkan = tidak dikenakan iuran wajib.</div>
         <button class="btn btn-ok btn-full" onclick="saveIuranFromPanel()">💾 Simpan Iuran Wajib</button>
       </div>
@@ -995,10 +996,27 @@ async function loadDataFromFirebase(){
     const [mSnap,tSnap,aSnap,uSnap]=await Promise.all([
       fbGet('members'),fbGet('transactions'),fbGet('announcements'),fbGet('users_db')
     ]);
-    if(mSnap&&mSnap.exists()) members=toSafeArray(mSnap.val()).map(sanitizeMember).filter(Boolean);
+    if(mSnap&&mSnap.exists()){
+      members=toSafeArray(mSnap.val()).map(m=>{
+        m=sanitizeMember(m);
+        // Migration: fix iuran_wajib values entered without dot separator
+        // Values < 1000 are likely wrong (e.g. 250 instead of 250000)
+        // But we can't auto-correct without knowing intent — set to 0 if suspiciously small
+        // Actually we should NOT auto-migrate. User must re-enter via panel.
+        return m;
+      }).filter(Boolean);
+    }
     if(tSnap&&tSnap.exists()) transactions=toSafeArray(tSnap.val()).filter(Boolean);
     if(aSnap&&aSnap.exists()) announcements=toSafeArray(aSnap.val()).filter(Boolean);
     if(uSnap&&uSnap.exists()) USERS_DB={...USERS_DB,...(uSnap.val()||{})};
+    // Load app settings (logo, title, subtitle) from Firebase
+    const sSnap=await fbGet('app_settings');
+    if(sSnap&&sSnap.exists()){
+      const remoteSettings=sSnap.val()||{};
+      settingsData={...settingsData,...remoteSettings};
+      localStorage.setItem('kpri_settings',JSON.stringify(settingsData));
+      applySettingsToUI();
+    }
   }catch(e){
     console.warn('Firebase load error:',e);
     showToast('⚠️ Gagal load data Firebase','err');
@@ -1062,6 +1080,16 @@ function subscribeRealtime(){
     if(snap.exists()) USERS_DB={...USERS_DB,...(snap.val()||{})};
   }));
 
+  // APP SETTINGS — live sync (logo, title, subtitle from pengurus)
+  _unsubs.push(listenPath('app_settings',snap=>{
+    if(snap.exists()){
+      const remoteSettings=snap.val()||{};
+      settingsData={...settingsData,...remoteSettings};
+      localStorage.setItem('kpri_settings',JSON.stringify(settingsData));
+      applySettingsToUI();
+    }
+  }));
+
   // CHAT badge — listen to chat_all for new message notification
   _unsubs.push(listenPath('chat_all',snap=>{
     if(!isPageActive('chat')){
@@ -1101,8 +1129,10 @@ document.addEventListener('input',e=>{
   }
 });
 // ===== END AUTO FORMAT =====
+
+// HELPERS
+const priMap={info:{lbl:'ℹ️ Informasi',cls:'b-inf'},penting:{lbl:'⚠️ Penting',cls:'b-acc'},urgent:{lbl:'🚨 Urgent',cls:'b-err'}};
 function fmtRp(n){return'Rp '+(+n||0).toLocaleString('id-ID');}
-function fmtShort(n){n=+(n||0);if(n>=1e9)return'Rp '+(n/1e9).toFixed(1)+'M';if(n>=1e6)return'Rp '+(n/1e6).toFixed(1)+'Jt';if(n>=1e3)return'Rp '+(n/1e3).toFixed(0)+'Rb';return fmtRp(n);}
 function fmtDate(d){if(!d)return'—';const dt=new Date(d);return`${dt.getDate()} ${BULAN[dt.getMonth()]} ${dt.getFullYear()}`;}
 function today(){return new Date().toISOString().split('T')[0];}
 function nowTime(){const n=new Date();return n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');}
@@ -1252,7 +1282,7 @@ function renderBeranda(){
     document.getElementById('h-kekayaan').textContent=fmtRp(tot.kekayaan);
     document.getElementById('h-piutang').textContent=fmtShort(tot.sisa_piutang);
     document.getElementById('h-angsuran').textContent=fmtShort(tot.total_angs);
-    document.getElementById('h-iuran').textContent=m.iuran_wajib?fmtShort(m.iuran_wajib):'—';
+    document.getElementById('h-iuran').textContent=m.iuran_wajib?fmtRp(m.iuran_wajib):'—';
     document.getElementById('tag-angs').textContent=fmtRp(tot.total_angs);
     // Iuran wajib bulan ini
     const iuranWajib=m.iuran_wajib||0;
@@ -1320,7 +1350,7 @@ function renderTxItems(list, showActions=false){
     <div class="tx-ico ${t.tipe}">${TX_ICO[t.kat]||'💰'}</div>
     <div class="tx-meta"><div class="tx-desc">${t.ket||TX_LBL[t.kat]||t.kat}</div>
     <div class="tx-info2"><span>${fmtDate(t.tgl)}</span>&nbsp;·&nbsp;<span class="badge ${t.tipe==='D'?'b-err':'b-ok'}">${t.tipe==='D'?'DEBIT':'KREDIT'}</span>&nbsp;·&nbsp;<span>${t.anggota}</span></div>
-    ${isP?`<div class="tx-actions"><button class="btn-act edit" onclick="editTx(${t.id})">✏️</button><button class="btn-act del" onclick="delTx(${t.id})">🗑️</button></div>`:''}
+    ${isP&&showActions?`<div class="tx-actions"><button class="btn-act edit" onclick="editTx(${t.id})">✏️ Edit</button><button class="btn-act del" onclick="delTx(${t.id})">🗑️ Hapus</button></div>`:''}
     </div>
     <div class="tx-right"><div class="tx-amt ${t.tipe}">${t.tipe==='D'?'-':'+'}${fmtRp(t.jml)}</div><div class="tx-cat">${TX_LBL[t.kat]||t.kat}</div></div>
   </div>`).join('');
@@ -1333,7 +1363,7 @@ function renderTx(filter='all'){
   else if(filter==='angsuran')list=list.filter(t=>t.kat==='angsuran');
   document.getElementById('sum-D').textContent=fmtRp(list.filter(t=>t.tipe==='D').reduce((s,t)=>s+t.jml,0));
   document.getElementById('sum-K').textContent=fmtRp(list.filter(t=>t.tipe==='K').reduce((s,t)=>s+t.jml,0));
-  document.getElementById('tx-list').innerHTML=renderTxItems(list);
+  document.getElementById('tx-list').innerHTML=renderTxItems(list, true);
 }
 function filterTx(f,el){document.querySelectorAll('#pg-transaksi .tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderTx(f);}
 
@@ -1689,6 +1719,9 @@ function openIuranDetail(id){
   const rawVal=m.iuran_wajib||0;
   const inp=document.getElementById('iuran-detail-input');
   inp.value=rawVal>0?rawVal.toLocaleString('id-ID'):'';
+  // Show warning if value seems wrong (< 1000 = likely entered without thousand separator)
+  const warn=document.getElementById('iuran-value-warning');
+  if(warn)warn.style.display=(rawVal>0&&rawVal<1000)?'block':'none';
   const ov=document.getElementById('iuran-detail-overlay');
   ov.style.display='flex';
   setTimeout(()=>document.getElementById('iuran-detail-input').focus(),200);
@@ -2229,7 +2262,7 @@ function applyLogo(){
   saveSettings();
   applyLogoToUI(tempLogoBase64);
   tempLogoBase64 = null;
-  showToast('✅ Logo berhasil diterapkan!','ok');
+  // toast shown by saveSettings
 }
 
 function removeLogo(){
@@ -2322,6 +2355,12 @@ function saveSettings(){
   }catch(e){
     showToast('⚠️ Gagal menyimpan ke perangkat','err');
   }
+  // Also save to Firebase so all devices get the same settings
+  fbSet('app_settings', settingsData).then(()=>{
+    showToast('✅ Pengaturan disimpan & sinkron ke semua perangkat','ok');
+  }).catch(()=>{
+    showToast('⚠️ Tersimpan lokal, gagal sinkron ke server','err');
+  });
 }
 
 function renderPengaturan(){
