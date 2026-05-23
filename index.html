@@ -241,6 +241,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .c-time{font-size:.6rem;opacity:.55;margin-top:3px;display:block;}
 .c-file{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:3px 7px;font-size:.67rem;margin-top:4px;background:rgba(255,255,255,.18);}
 .c-file.ext{background:var(--pri-xl);color:var(--pri);}
+.ch-btn{padding:5px 11px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:.72rem;font-weight:700;color:var(--muted);cursor:pointer;transition:.15s;}
+.ch-btn.on{background:var(--pri);border-color:var(--pri);color:#fff;}
+.ch-check{display:flex;align-items:center;gap:7px;padding:5px 0;font-size:.76rem;cursor:pointer;}
+.ch-check input[type=checkbox]{width:15px;height:15px;accent-color:var(--pri);cursor:pointer;}
+.iuran-member-card{background:#fff;border-radius:11px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--sh);cursor:pointer;transition:.15s;}
+.iuran-member-card:hover{transform:translateY(-1px);box-shadow:var(--sh-lg);}
+.iuran-member-card:active{transform:translateY(0);}
+.iuran-badge-set{background:var(--ok-l);color:var(--ok-d);font-size:.65rem;font-weight:800;padding:3px 8px;border-radius:20px;}
+.iuran-badge-unset{background:var(--err-l);color:var(--err-d);font-size:.65rem;font-weight:800;padding:3px 8px;border-radius:20px;}
+.iuran-detail-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;}
+.iuran-detail-box{background:#fff;border-radius:20px 20px 0 0;padding:20px 18px 36px;width:100%;max-width:480px;animation:slideUp .25s ease;}
 .c-inp{flex:1;border:1.5px solid var(--border);border-radius:18px;padding:8px 11px;font-size:.81rem;font-family:inherit;outline:none;resize:none;max-height:80px;overflow-y:auto;}
 .c-inp:focus{border-color:var(--pri);}
 .c-send{width:36px;height:36px;background:var(--pri);border:none;border-radius:50%;color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(15,76,129,.3);}
@@ -405,7 +416,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
       <div class="mgrid">
         <div class="mi" onclick="goPage('transaksi')"><div class="mi-ico">💳</div><div class="mi-lbl">Transaksi</div></div>
         <div class="mi" onclick="goPage('simpanan')"><div class="mi-ico">🏦</div><div class="mi-lbl">Simpanan</div></div>
-        <div class="mi" onclick="goPage('simpanan');setTimeout(()=>document.getElementById('iuran-list').scrollIntoView({behavior:'smooth'}),300)"><div class="mi-ico">📋</div><div class="mi-lbl">Iuran Wajib</div></div>
+        <div class="mi" onclick="currentUser&&currentUser.role==='pengurus'?goPage('iuran'):goPage('simpanan')"><div class="mi-ico">📋</div><div class="mi-lbl">Iuran Wajib</div></div>
         <div class="mi" onclick="goPage('pinjaman')"><div class="mi-ico">💸</div><div class="mi-lbl">Pinjaman</div></div>
         <div class="mi" onclick="goPage('anggota')"><div class="mi-ico">👥</div><div class="mi-lbl">Anggota</div></div>
         <div class="mi" onclick="goPage('laporan')"><div class="mi-ico">📊</div><div class="mi-lbl">Laporan</div></div>
@@ -530,14 +541,60 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
       <div id="ann-list"></div>
       <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
     </div>
-    <!-- CHAT -->
+    <!-- IURAN WAJIB MANAGEMENT (pengurus only) -->
+    <div class="page" id="pg-iuran">
+      <div class="sec-row">
+        <div class="sec-t" style="margin:0">📋 Kelola Iuran Wajib</div>
+        <button class="btn btn-ghost btn-sm" onclick="goPage('beranda')">← Kembali</button>
+      </div>
+      <div class="info-box" style="margin-bottom:10px;">💡 Klik nama anggota untuk mengatur besaran iuran wajib per bulan. Setiap anggota dapat memiliki nominal yang berbeda sesuai ketentuan.</div>
+      <input class="fi" id="iuran-search" style="margin-bottom:10px;" placeholder="🔍 Cari anggota..." oninput="renderIuranList(this.value)">
+      <div id="iuran-member-list"></div>
+      <div class="wm">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
+    </div>
+    <!-- IURAN DETAIL OVERLAY (outside page div so z-index works) -->
+    <div id="iuran-detail-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.5);align-items:flex-end;justify-content:center;">
+      <div class="iuran-detail-box">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:1.05rem;font-weight:900;" id="iuran-detail-nama">—</div>
+            <div style="font-size:.72rem;color:var(--muted);" id="iuran-detail-id">—</div>
+          </div>
+          <button onclick="closeIuranDetail()" style="background:var(--bg);border:none;border-radius:50%;width:34px;height:34px;font-size:1rem;cursor:pointer;line-height:1;">✕</button>
+        </div>
+        <div style="background:var(--inf-l);border-radius:12px;padding:12px 14px;margin-bottom:13px;">
+          <div style="font-size:.63rem;font-weight:800;color:var(--pri);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Iuran Wajib Saat Ini</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:1.5rem;font-weight:900;color:var(--pri);" id="iuran-detail-current">Belum diatur</div>
+        </div>
+        <label class="fl" style="margin-bottom:5px;display:block;">Nominal Iuran Baru (Rp)</label>
+        <input type="number" class="fi" id="iuran-detail-input" placeholder="Contoh: 150000" min="0" style="font-size:.95rem;font-weight:700;margin-bottom:6px;">
+        <div style="font-size:.68rem;color:var(--muted);margin-bottom:14px;">Isi 0 atau kosongkan = tidak dikenakan iuran wajib.</div>
+        <button class="btn btn-ok btn-full" onclick="saveIuranFromPanel()">💾 Simpan Iuran Wajib</button>
+      </div>
+    </div>
     <div class="page" id="pg-chat" style="display:none;flex-direction:column;padding:0;height:100%;overflow:hidden;">
-      <div class="sec-t" style="padding:14px 12px 8px;flex-shrink:0;margin:0;">💬 Forum Diskusi</div>
+      <!-- Channel selector - pengurus only -->
+      <div id="chat-channel-bar" style="display:none;background:#fff;border-bottom:1px solid var(--border);padding:8px 12px;flex-shrink:0;">
+        <div style="font-size:.63rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Kirim pesan ke:</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="ch-btn-group">
+          <button class="ch-btn on" id="ch-btn-pengurus" onclick="switchChannel('pengurus',this)">🔑 Sesama Pengurus</button>
+          <button class="ch-btn" id="ch-btn-all" onclick="switchChannel('all',this)">👥 Semua Anggota</button>
+          <button class="ch-btn" id="ch-btn-tertentu" onclick="switchChannel('tertentu',this)">🎯 Anggota Tertentu</button>
+        </div>
+        <div id="ch-tertentu-list" style="display:none;margin-top:8px;max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:9px;padding:8px;background:var(--bg);">
+          <div style="font-size:.65rem;color:var(--muted);margin-bottom:5px;font-weight:700;">Centang anggota yang dituju:</div>
+          <div id="ch-member-checks"></div>
+        </div>
+      </div>
+      <!-- Active channel label - visible to all -->
+      <div id="chat-channel-info" style="background:var(--pri-xl);padding:5px 12px;font-size:.68rem;font-weight:700;color:var(--pri);flex-shrink:0;">
+        <span id="chat-channel-label">💬 Forum Diskusi</span>
+      </div>
       <div class="chat-area" id="chat-area" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px 8px;-webkit-overflow-scrolling:touch;"></div>
       <div class="chat-bar on" id="chat-bar" style="margin:0;border-radius:0;">
         <input type="file" id="file-att" style="display:none" onchange="attachFile(this)">
         <button class="c-att" onclick="document.getElementById('file-att').click()">📎</button>
-        <textarea class="c-inp" id="c-inp" rows="1" placeholder="Tulis pesan diskusi..."></textarea>
+        <textarea class="c-inp" id="c-inp" rows="1" placeholder="Tulis pesan..."></textarea>
         <button class="c-send" onclick="sendChat()">➤</button>
       </div>
       <div class="wm" style="flex-shrink:0;padding-bottom:6px;">Developed &amp; Supported by <b>D.D Candra</b> © 2026</div>
@@ -678,12 +735,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
       <div class="dg" id="ova-dg"></div>
       <!-- Pengaturan Iuran Wajib - hanya tampil untuk pengurus -->
       <div id="ova-iuran-section" style="display:none;margin-bottom:10px;">
-        <div class="akt-section">
-          <div class="akt-title">📋 Iuran Wajib Bulanan</div>
-          <div class="i2">
-            <div class="fg"><label class="fl">Besaran Iuran/Bulan (Rp)</label><input type="number" class="fi" id="ova-iuran-val" placeholder="Contoh: 150000" min="0"></div>
+        <div class="akt-section" style="background:var(--inf-l);border-radius:11px;padding:12px;">
+          <div class="akt-title" style="color:var(--pri);">📋 Iuran Wajib Bulanan</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:9px;">Atur besaran iuran wajib per bulan untuk anggota ini.</div>
+          <div class="fg">
+            <label class="fl">Nominal Iuran/Bulan (Rp)</label>
+            <input type="number" class="fi" id="ova-iuran-val" placeholder="Contoh: 150000" min="0" style="font-size:.9rem;font-weight:700;">
           </div>
-          <div style="font-size:.71rem;color:var(--muted);margin-bottom:8px;">Kosongkan / isi 0 jika anggota ini tidak dikenakan iuran wajib.</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px;">Isi 0 atau kosongkan = tidak dikenakan iuran wajib.</div>
           <button class="btn btn-ok btn-full" onclick="saveIuranWajib()">💾 Simpan Iuran Wajib</button>
         </div>
       </div>
@@ -969,17 +1028,17 @@ function subscribeRealtime(){
     if(snap.exists()) USERS_DB={...USERS_DB,...(snap.val()||{})};
   }));
 
-  // CHAT — live sync + badge
-  _unsubs.push(listenPath('chat',snap=>{
-    const raw=snap.exists()?snap.val():null;
-    const incoming=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
-    const hadNew=incoming.length>chatMessages.length;
-    chatMessages=incoming;
-    if(isPageActive('chat')){
-      renderChat(); // renderChat already scrolls to bottom
-    } else if(hadNew && currentUser){
-      const badge=document.getElementById('chat-badge');
-      if(badge)badge.style.display='';
+  // CHAT badge — listen to chat_all for new message notification
+  _unsubs.push(listenPath('chat_all',snap=>{
+    if(!isPageActive('chat')){
+      const raw=snap.exists()?snap.val():null;
+      const incoming=toSafeArray(raw).filter(Boolean);
+      const prev=(_chatData['chat_all']||[]).length;
+      if(incoming.length>prev&&currentUser){
+        const badge=document.getElementById('chat-badge');
+        if(badge)badge.style.display='';
+      }
+      _chatData['chat_all']=incoming.sort((a,b)=>(a.id||0)-(b.id||0));
     }
   }));
 }
@@ -1066,7 +1125,10 @@ async function doLogin(restoredUser, restoredPage){
   setTimeout(()=>document.getElementById('splash').style.display='none',600);
 }
 
-function doLogout(){unsubscribeAll();clearSession();location.reload();}
+function doLogout(){
+  if(_channelUnsub){_channelUnsub();_channelUnsub=null;}
+  unsubscribeAll();clearSession();location.reload();
+}
 
 
 async function manualRefresh(){
@@ -1113,9 +1175,9 @@ function goPage(page){
   const idx=navIdx[page];if(idx!==undefined)document.querySelectorAll('.bni')[idx].classList.add('on');
   if(page==='chat'){
     document.getElementById('chat-badge').style.display='none';
-    renderChat();
+    initChatPage();
   }
-  const map={transaksi:()=>renderTx('all'),anggota:()=>renderMembers(''),laporan:renderLaporan,pengumuman:renderAnn,chat:()=>{},simpanan:renderSimpanan,pinjaman:renderPinjaman,profil:renderProfil,pengaturan:renderPengaturan};
+  const map={transaksi:()=>renderTx('all'),anggota:()=>renderMembers(''),laporan:renderLaporan,pengumuman:renderAnn,chat:()=>{},simpanan:renderSimpanan,pinjaman:renderPinjaman,profil:renderProfil,pengaturan:renderPengaturan,iuran:()=>renderIuranList('')};
   if(map[page])map[page]();
   // Save page to session
   if(currentUser)saveSession(page);
@@ -1463,12 +1525,68 @@ function resetPassDefault(){
   showToast(`✅ Password direset ke: ${def}`,'ok');
 }
 
+// ===== IURAN WAJIB MANAGEMENT =====
+let _iuranCurrentId=null;
+
+function renderIuranList(q){
+  const list=q?members.filter(m=>m.nama.toLowerCase().includes(q.toLowerCase())||m.id.toLowerCase().includes(q.toLowerCase())):members;
+  const el=document.getElementById('iuran-member-list');
+  if(!el)return;
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-ico">👤</div><div class="empty-txt">Tidak ada anggota</div></div>';return;}
+  el.innerHTML=list.map(m=>{
+    const set=m.iuran_wajib>0;
+    return`<div class="iuran-member-card" onclick="openIuranDetail('${m.id}')">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--pri-xl);display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--pri);font-size:.88rem;">${m.nama.charAt(0)}</div>
+        <div>
+          <div style="font-weight:800;font-size:.84rem;">${m.nama}</div>
+          <div style="font-size:.68rem;color:var(--muted);">${m.id} · ${m.jabatan}</div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:'DM Sans',sans-serif;font-weight:900;font-size:.88rem;color:${set?'var(--ok-d)':'var(--muted)'};">${set?fmtRp(m.iuran_wajib):'—'}</div>
+        <span class="${set?'iuran-badge-set':'iuran-badge-unset'}">${set?'Sudah diatur':'Belum diatur'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openIuranDetail(id){
+  const m=members.find(x=>x.id===id);if(!m)return;
+  _iuranCurrentId=id;
+  document.getElementById('iuran-detail-nama').textContent=m.nama;
+  document.getElementById('iuran-detail-id').textContent=m.id+' · '+m.jabatan;
+  document.getElementById('iuran-detail-current').textContent=m.iuran_wajib>0?fmtRp(m.iuran_wajib):'Belum diatur';
+  document.getElementById('iuran-detail-input').value=m.iuran_wajib||'';
+  const ov=document.getElementById('iuran-detail-overlay');
+  ov.style.display='flex';
+  setTimeout(()=>document.getElementById('iuran-detail-input').focus(),200);
+}
+
+function closeIuranDetail(){
+  const ov=document.getElementById('iuran-detail-overlay');
+  if(ov)ov.style.display='none';
+  _iuranCurrentId=null;
+}
+
+function saveIuranFromPanel(){
+  if(!_iuranCurrentId)return;
+  const m=members.find(x=>x.id===_iuranCurrentId);if(!m)return;
+  const val=+document.getElementById('iuran-detail-input').value||0;
+  m.iuran_wajib=val;
+  fbSaveMembers();
+  closeIuranDetail();
+  renderIuranList(document.getElementById('iuran-search')?document.getElementById('iuran-search').value:'');
+  showToast(val?`✅ Iuran ${m.nama}: ${fmtRp(val)}/bulan`:`✅ Iuran ${m.nama} dikosongkan`,'ok');
+}
+// ===== END IURAN WAJIB MANAGEMENT =====
+
 function saveIuranWajib(){
   const m=members.find(x=>x.id===ovaCurrentMemberId);if(!m)return;
   const val=+document.getElementById('ova-iuran-val').value||0;
   m.iuran_wajib=val;
   fbSaveMembers();
-  showToast(val?`✅ Iuran wajib ${m.nama}: ${fmtRp(val)}/bulan`:`✅ Iuran wajib ${m.nama} dikosongkan`,'ok');
+  showToast(val?`✅ Iuran ${m.nama}: ${fmtRp(val)}/bulan`:`✅ Iuran ${m.nama} dikosongkan`,'ok');
 }
 function openAddMember(){if(currentUser.role!=='pengurus'){showToast('⛔ Hanya pengurus','err');return;}openOv('ov-add-member');}
 function updatePreviewCreds(){
@@ -1627,6 +1745,70 @@ function saveAnn(){
 function delAnn(id){if(!confirm('Hapus pengumuman ini?'))return;announcements=announcements.filter(a=>a.id!==id);renderAnn();fbSaveAnnouncements();showToast('🗑️ Dihapus');}
 
 // CHAT
+// ===== CHAT MULTI-CHANNEL =====
+let _currentChannel='pengurus'; // default
+let _channelUnsub=null;
+let _chatData={}; // keyed by channel
+
+const CHANNEL_META={
+  pengurus:{label:'🔑 Sesama Pengurus',path:'chat_pengurus',placeholder:'Pesan khusus pengurus...'},
+  all:{label:'👥 Semua Anggota',path:'chat_all',placeholder:'Pesan untuk semua anggota...'},
+};
+
+function getVisibleChannels(){
+  const isP=currentUser&&currentUser.role==='pengurus';
+  if(isP) return['pengurus','all','tertentu'];
+  // Anggota: lihat chat_all + chat yang ditujukan ke dirinya
+  return['all_view'];
+}
+
+function switchChannel(ch,btn){
+  _currentChannel=ch;
+  document.querySelectorAll('.ch-btn').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  // Show/hide tertentu checklist
+  const tList=document.getElementById('ch-tertentu-list');
+  if(tList)tList.style.display=(ch==='tertentu'?'block':'none');
+  // Update label
+  const labels={pengurus:'🔑 Sesama Pengurus',all:'👥 Semua Anggota',tertentu:'🎯 Anggota Tertentu'};
+  const inp=document.getElementById('c-inp');
+  if(inp)inp.placeholder=ch==='pengurus'?'Pesan khusus pengurus...':ch==='all'?'Pesan untuk semua anggota...':'Pilih anggota lalu tulis pesan...';
+  subscribeCurrentChannel();
+}
+
+function subscribeCurrentChannel(){
+  if(_channelUnsub){_channelUnsub();_channelUnsub=null;}
+  if(!window._fb)return;
+  const isP=currentUser&&currentUser.role==='pengurus';
+  // Determine which Firebase path to listen to
+  let path;
+  if(isP){
+    path=_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+    // For 'tertentu' channel, we show chat_all but filter display
+    if(_currentChannel==='tertentu')path='chat_all';
+  } else {
+    // Anggota always sees chat_all
+    path='chat_all';
+    // Also check if there are targeted messages for them
+  }
+  const r=window._fb.ref(path);
+  _channelUnsub=()=>r.off('value');
+  r.on('value',snap=>{
+    const raw=snap.exists()?snap.val():null;
+    let msgs=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
+    // If anggota: filter out messages not meant for them
+    if(!isP){
+      msgs=msgs.filter(m=>{
+        if(!m.targets||m.targets==='all')return true;
+        if(Array.isArray(m.targets))return m.targets.includes(currentUser.memberKey)||m.targets.includes(currentUser.username);
+        return false;
+      });
+    }
+    _chatData[path]=msgs;
+    if(isPageActive('chat'))renderChat();
+  });
+}
+
 function scrollChatToBottom(smooth){
   const el=document.getElementById('chat-area');
   if(!el)return;
@@ -1636,28 +1818,40 @@ function scrollChatToBottom(smooth){
 function renderChat(){
   const el=document.getElementById('chat-area');
   if(!el)return;
-  if(!chatMessages.length){
-    el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-txt">Belum ada pesan. Mulai diskusi!</div></div>';
-    return;
+  const isP=currentUser&&currentUser.role==='pengurus';
+  const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+  const msgs=_chatData[path]||[];
+
+  // Update channel label
+  const lbl=document.getElementById('chat-channel-label');
+  if(lbl){
+    if(!isP)lbl.textContent='💬 Forum Diskusi';
+    else if(_currentChannel==='pengurus')lbl.textContent='🔑 Forum Khusus Pengurus';
+    else if(_currentChannel==='all')lbl.textContent='👥 Diskusi Semua Anggota';
+    else lbl.textContent='🎯 Pesan Anggota Tertentu';
   }
-  // Always sort oldest → newest (ascending) so oldest is at top
-  const sorted=[...chatMessages].sort((a,b)=>(a.id||0)-(b.id||0));
-  const wasAtBottom=el.scrollHeight-el.scrollTop-el.clientHeight<60;
-  el.innerHTML=sorted.map(m=>{
+
+  if(!msgs.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">💬</div><div class="empty-txt">Belum ada pesan. Mulai diskusi!</div></div>';
+    scrollChatToBottom(false);return;
+  }
+  el.innerHTML=msgs.map(m=>{
     const mine=currentUser&&m.user===currentUser.name;
+    const targetBadge=m.targets&&m.targets!=='all'&&Array.isArray(m.targets)?
+      `<div style="font-size:.6rem;color:var(--muted);margin-bottom:3px;">🎯 Ke: ${m.targetNames||m.targets.join(', ')}</div>`:'';
     return`<div class="cm ${mine?'me':''}">
       <div class="c-ava">${(m.user||'?').charAt(0).toUpperCase()}</div>
       <div class="c-wrap">
         <div class="c-sender">${m.user} · ${m.time}</div>
         <div class="c-bub">
+          ${targetBadge}
           <div class="c-text">${m.text}</div>
-          ${m.file?`<div class="c-file ${mine?'':'ext'}">📎 ${m.file}</div>`:''}
+          ${m.file?`<div class="c-file">📎 ${m.file}</div>`:''}
           <span class="c-time">${fmtDate(m.tgl)}</span>
         </div>
       </div>
     </div>`;
   }).join('');
-  // Scroll to bottom: always on first load, or if was already near bottom
   scrollChatToBottom(false);
 }
 
@@ -1666,19 +1860,58 @@ function sendChat(){
   if(!inp)return;
   const text=inp.value.trim();
   if(!text)return;
-  const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today()};
+  const isP=currentUser&&currentUser.role==='pengurus';
+  // Validate tertentu channel has targets selected
+  if(isP&&_currentChannel==='tertentu'){
+    const checked=[...document.querySelectorAll('#ch-member-checks input:checked')];
+    if(!checked.length){showToast('❌ Pilih minimal 1 anggota yang dituju','err');return;}
+    const targets=checked.map(c=>c.value);
+    const targetNames=checked.map(c=>c.dataset.name).join(', ');
+    const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),targets,targetNames,channel:'tertentu'};
+    inp.value='';inp.style.height='auto';
+    fbPush('chat_all',msg);
+    setTimeout(()=>scrollChatToBottom(true),50);
+    return;
+  }
+  const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+  const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),targets:'all',channel:_currentChannel||'all'};
   inp.value='';inp.style.height='auto';
-  fbPush('chat',msg);
-  // Optimistic scroll down immediately
+  fbPush(path,msg);
   setTimeout(()=>scrollChatToBottom(true),50);
 }
+
 function attachFile(input){
   if(!input.files||!input.files[0])return;
-  const msg={id:Date.now(),user:currentUser.name,text:'Mengirim file:',file:input.files[0].name,time:nowTime(),tgl:today()};
+  const isP=currentUser&&currentUser.role==='pengurus';
+  const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+  const msg={id:Date.now(),user:currentUser.name,text:'Mengirim file:',file:input.files[0].name,time:nowTime(),tgl:today(),targets:'all'};
   input.value='';
-  fbPush('chat',msg);
+  fbPush(path,msg);
   showToast('📎 File dilampirkan','ok');
 }
+
+function buildMemberChecklist(){
+  const el=document.getElementById('ch-member-checks');
+  if(!el)return;
+  el.innerHTML=members.map(m=>`
+    <label class="ch-check">
+      <input type="checkbox" value="${m.id}" data-name="${m.nama}">
+      <span>${m.nama} <span style="color:var(--muted);font-size:.65rem;">${m.id}</span></span>
+    </label>`).join('');
+}
+
+function initChatPage(){
+  const isP=currentUser&&currentUser.role==='pengurus';
+  // Show/hide channel bar
+  const bar=document.getElementById('chat-channel-bar');
+  if(bar)bar.style.display=isP?'block':'none';
+  // Default channel
+  _currentChannel=isP?'pengurus':'all';
+  if(isP)buildMemberChecklist();
+  subscribeCurrentChannel();
+  renderChat();
+}
+// ===== END CHAT MULTI-CHANNEL =====
 
 // NOTIF
 function renderNP(){
