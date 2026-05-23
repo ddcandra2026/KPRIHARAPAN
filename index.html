@@ -2054,12 +2054,30 @@ function subscribeCurrentChannel(){
   _channelUnsub=()=>r.off('value');
   r.on('value',snap=>{
     const raw=snap.exists()?snap.val():null;
+    // Sort ascending: oldest (smallest id/timestamp) first → displays at TOP
     let msgs=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
-    // If anggota: filter out messages not meant for them
+    // If anggota: only show messages meant for them
     if(!isP){
-      msgs=msgs.filter(m=>{
-        if(!m.targets||m.targets==='all')return true;
-        if(Array.isArray(m.targets))return m.targets.includes(currentUser.memberKey)||m.targets.includes(currentUser.username);
+      // Find this anggota's member record to get their member ID
+      const myMember=members.find(m=>
+        m.username===currentUser.username||
+        m.id===currentUser.memberKey
+      );
+      const myMemberId=myMember?myMember.id:null;
+
+      msgs=msgs.filter(msg=>{
+        // Case 1: No targets = broadcast to all → show
+        if(!msg.targets)return true;
+        // Case 2: targets = 'all' string = broadcast → show
+        if(msg.targets==='all')return true;
+        // Case 3: channel = 'all' = broadcast → show
+        if(msg.channel==='all')return true;
+        // Case 4: targets is array = targeted message
+        if(Array.isArray(msg.targets)){
+          // Show ONLY if this anggota's member ID is in the targets list
+          return myMemberId&&msg.targets.includes(myMemberId);
+        }
+        // Default: hide unknown formats
         return false;
       });
     }
@@ -2079,7 +2097,8 @@ function renderChat(){
   if(!el)return;
   const isP=currentUser&&currentUser.role==='pengurus';
   const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
-  const msgs=_chatData[path]||[];
+  // Always sort ascending: oldest first (top) → newest last (bottom)
+  const msgs=[...(_chatData[path]||[])].sort((a,b)=>(a.id||0)-(b.id||0));
 
   // Update channel label
   const lbl=document.getElementById('chat-channel-label');
@@ -2124,16 +2143,19 @@ function sendChat(){
   if(isP&&_currentChannel==='tertentu'){
     const checked=[...document.querySelectorAll('#ch-member-checks input:checked')];
     if(!checked.length){showToast('❌ Pilih minimal 1 anggota yang dituju','err');return;}
-    const targets=checked.map(c=>c.value);
+    const targets=checked.map(c=>c.value); // array of member IDs
     const targetNames=checked.map(c=>c.dataset.name).join(', ');
-    const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),targets,targetNames,channel:'tertentu'};
+    const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
+               targets,targetNames,channel:'tertentu'};
     inp.value='';inp.style.height='auto';
     fbPush('chat_all',msg);
     setTimeout(()=>scrollChatToBottom(true),50);
     return;
   }
   const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
-  const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),targets:'all',channel:_currentChannel||'all'};
+  // 'all' channel — no targets restriction, visible to everyone
+  const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
+             targets:'all',channel:'all'};
   inp.value='';inp.style.height='auto';
   fbPush(path,msg);
   setTimeout(()=>scrollChatToBottom(true),50);
