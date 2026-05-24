@@ -1083,8 +1083,8 @@ function subscribeRealtime(){
     refreshKKSelect();
     const sel=document.getElementById('tx-anggota');
     if(sel)sel.innerHTML='<option value="Semua">Semua Anggota</option>'+members.map(m=>`<option value="${m.nama}">${m.nama}</option>`).join('');
-    // Re-run chat filter for anggota when members data loads
-    if(currentUser&&currentUser.role!=='pengurus'&&_channelUnsub){
+    // Re-subscribe chat after members load so filter has correct member IDs
+    if(currentUser&&currentUser.role!=='pengurus'&&isPageActive('chat')){
       subscribeCurrentChannel();
     }
   }));
@@ -2058,56 +2058,51 @@ function subscribeCurrentChannel(){
   if(_channelUnsub){_channelUnsub();_channelUnsub=null;}
   if(!window._fb)return;
   const isP=currentUser&&currentUser.role==='pengurus';
-
-  // ANGGOTA: gunakan path terpisah per-anggota untuk privasi sempurna
-  if(!isP){
-    const myMember=members.find(m=>m.username===currentUser.username||m.id===currentUser.memberKey);
-    const myId=myMember?myMember.id:(currentUser.memberKey||null);
-
-    let broadcastMsgs=[];
-    let privateMsgs=[];
-
-    const mergeAndRender=()=>{
-      // Broadcast: hanya tampilkan pesan yang targets:'all' atau tidak ada targets
-      const pub=broadcastMsgs.filter(m=>{
-        if(Array.isArray(m.targets))return false; // privat, skip
-        if(m.channel==='tertentu')return false;  // privat, skip
-        return true; // broadcast
-      });
-      const all=[...pub,...privateMsgs].sort((a,b)=>(a.id||0)-(b.id||0));
-      _chatData['chat_all']=all;
-      if(isPageActive('chat'))renderChat();
-    };
-
-    const r1=window._fb.ref('chat_all');
-    r1.on('value',snap=>{
-      broadcastMsgs=toSafeArray(snap.exists()?snap.val():null).filter(Boolean);
-      mergeAndRender();
-    });
-    const unsubs=[()=>r1.off('value')];
-
-    // Dengarkan path privat milik anggota ini saja
-    if(myId){
-      const r2=window._fb.ref('chat_private_'+myId);
-      r2.on('value',snap=>{
-        privateMsgs=toSafeArray(snap.exists()?snap.val():null).filter(Boolean);
-        mergeAndRender();
-      });
-      unsubs.push(()=>r2.off('value'));
-    }
-    _channelUnsub=()=>unsubs.forEach(fn=>fn());
-    return;
+  // Determine which Firebase path to listen to
+  let path;
+  if(isP){
+    path=_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+    // For 'tertentu' channel, we show chat_all but filter display
+    if(_currentChannel==='tertentu')path='chat_all';
+  } else {
+    // Anggota always sees chat_all
+    path='chat_all';
+    // Also check if there are targeted messages for them
   }
-
-  // PENGURUS: dengarkan channel yang dipilih
-  let path=_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
-  if(_currentChannel==='tertentu')path='chat_pengurus_sent';
-
   const r=window._fb.ref(path);
   _channelUnsub=()=>r.off('value');
   r.on('value',snap=>{
     const raw=snap.exists()?snap.val():null;
-    const msgs=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
+    // Sort ascending: oldest (smallest id/timestamp) first → displays at TOP
+    let msgs=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
+    // ANGGOTA FILTER: hanya tampilkan pesan yang memang untuk mereka
+    if(!isP){
+      // Get member ID with multiple fallbacks
+      let myMemberId=currentUser.memberKey||null;
+      if(!myMemberId){
+        const myMember=members.find(m=>m.username===currentUser.username);
+        if(myMember)myMemberId=myMember.id;
+      }
+
+      msgs=msgs.filter(msg=>{
+        // Pesan tanpa targets = broadcast = semua lihat
+        if(!msg.targets&&!msg.channel)return true;
+        // Pesan channel 'all' tanpa targets array = broadcast
+        if(msg.channel==='all'&&msg.targets==='all')return true;
+        if(msg.channel==='all'&&!msg.targets)return true;
+        if(!msg.channel&&msg.targets==='all')return true;
+        if(!msg.channel&&!msg.targets)return true;
+        // Pesan dengan targets array = PRIVAT
+        if(Array.isArray(msg.targets)){
+          if(!myMemberId)return false; // tidak tahu siapa saya = tidak tampilkan
+          return msg.targets.includes(myMemberId);
+        }
+        // channel='tertentu' tanpa array targets = sembunyikan
+        if(msg.channel==='tertentu')return false;
+        // Default: broadcast
+        return msg.targets==='all';
+      });
+    }
     _chatData[path]=msgs;
     if(isPageActive('chat'))renderChat();
   });
@@ -2123,12 +2118,8 @@ function renderChat(){
   const el=document.getElementById('chat-area');
   if(!el)return;
   const isP=currentUser&&currentUser.role==='pengurus';
-  let path='chat_all';
-  if(isP){
-    if(_currentChannel==='pengurus')path='chat_pengurus';
-    else if(_currentChannel==='tertentu')path='chat_pengurus_sent';
-    else path='chat_all';
-  }
+  const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+  // Always sort ascending: oldest first (top) → newest last (bottom)
   const msgs=[...(_chatData[path]||[])].sort((a,b)=>(a.id||0)-(b.id||0));
 
   // Update channel label
@@ -2176,14 +2167,11 @@ function sendChat(){
     if(!checked.length){showToast('❌ Pilih minimal 1 anggota yang dituju','err');return;}
     const targets=checked.map(c=>c.value);
     const targetNames=checked.map(c=>c.dataset.name).join(', ');
+    // No confirm popup - just send with toast feedback
     const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
                targets,targetNames,channel:'tertentu'};
     inp.value='';inp.style.height='auto';
-    // Save to EACH target member's private path + pengurus path
-    targets.forEach(memberId=>{
-      fbPush(`chat_private_${memberId}`,msg);
-    });
-    fbPush('chat_pengurus_sent',msg); // keep copy for pengurus
+    fbPush('chat_all',msg);
     showToast(`🎯 Terkirim ke: ${targetNames}`,'ok');
     setTimeout(()=>scrollChatToBottom(true),50);
     return;
@@ -2274,24 +2262,11 @@ function initChatPage(){
   if(bar)bar.style.display=isP?'block':'none';
   _currentChannel=isP?'pengurus':'all';
   if(isP)buildMemberChecklist();
-
-  if(!isP&&members.length===0){
-    // Members not yet loaded — wait for them
-    const el=document.getElementById('chat-area');
-    if(el)el.innerHTML='<div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">Memuat data...</div></div>';
-    const waitForMembers=setInterval(()=>{
-      if(members.length>0){
-        clearInterval(waitForMembers);
-        subscribeCurrentChannel();
-        renderChat();
-      }
-    },200);
-    // Fallback after 5s
-    setTimeout(()=>{clearInterval(waitForMembers);subscribeCurrentChannel();renderChat();},5000);
-  } else {
+  // Small delay to ensure members array is populated from Firebase
+  setTimeout(()=>{
     subscribeCurrentChannel();
     renderChat();
-  }
+  },300);
 }
 // ===== END CHAT MULTI-CHANNEL =====
 
