@@ -2194,9 +2194,31 @@ function debugChatData(){
 }
 
 function clearChatConfirm(){
-  const path=_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
-  const label=_currentChannel==='pengurus'?'Forum Pengurus':'Forum Semua Anggota';
-  if(!confirm(`Hapus SEMUA pesan di "${label}"?\n\nTindakan ini tidak bisa dibatalkan.`))return;
+  // Determine correct path and label based on current channel
+  let path, label;
+  if(_currentChannel==='pengurus'){
+    path='chat_pengurus';
+    label='Forum Khusus Pengurus';
+  } else if(_currentChannel==='tertentu'){
+    // Pesan tertentu disimpan di chat_pengurus_sent DAN chat_private_xxx
+    // Hapus semua path sekaligus
+    label='Pesan Anggota Tertentu';
+    if(!confirm(`Hapus SEMUA pesan di "${label}"?\n\nIni akan menghapus pesan dari semua path privat.\nTidak bisa dibatalkan.`))return;
+    // Hapus chat_pengurus_sent
+    fbSet('chat_pengurus_sent',null);
+    // Hapus semua chat_private_xxx untuk setiap anggota
+    members.forEach(m=>{
+      fbSet(`chat_private_${m.id}`,null);
+    });
+    _chatData['chat_pengurus_sent']=[];
+    renderChat();
+    showToast('🗑️ Semua pesan privat dihapus','ok');
+    return;
+  } else {
+    path='chat_all';
+    label='Forum Semua Anggota';
+  }
+  if(!confirm(`Hapus SEMUA pesan di "${label}"?\n\nTidak bisa dibatalkan.`))return;
   fbSet(path,null).then(()=>{
     _chatData[path]=[];
     renderChat();
