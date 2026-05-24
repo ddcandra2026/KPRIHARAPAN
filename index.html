@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<!-- KPRI Harapan v20260524-fix-badge-privacy -->
+<!-- KPRI Harapan v20260524-fix-private-reply-v2 -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2032,6 +2032,7 @@ function delAnn(id){if(!confirm('Hapus pengumuman ini?'))return;announcements=an
 let _currentChannel='pengurus'; // default
 let _channelUnsub=null;
 let _chatData={}; // keyed by channel
+let _myPrivateMsgs=[]; // pesan private milik anggota ini (module-level untuk akses sendChat)
 
 const CHANNEL_META={
   pengurus:{label:'🔑 Sesama Pengurus',path:'chat_pengurus',placeholder:'Pesan khusus pengurus...'},
@@ -2101,6 +2102,7 @@ function subscribeCurrentChannel(){
       const r2=window._fb.ref('chat_private_'+myId);
       r2.on('value',snap=>{
         privateMsgs=toSafeArray(snap.exists()?snap.val():null).filter(Boolean);
+        _myPrivateMsgs=privateMsgs; // sync ke module-level agar sendChat bisa akses
         mergeAndRender();
       });
       unsubs.push(()=>r2.off('value'));
@@ -2198,11 +2200,36 @@ function sendChat(){
     setTimeout(()=>scrollChatToBottom(true),50);
     return;
   }
-  const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
-  const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
+  if(isP){
+    // Pengurus kirim ke channel yang dipilih
+    const path=_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+    const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
+               targets:'all',channel:'all'};
+    inp.value='';inp.style.height='auto';
+    fbPush(path,msg);
+    setTimeout(()=>scrollChatToBottom(true),50);
+    return;
+  }
+  // ANGGOTA: cek apakah ada pesan private yang ditujukan ke dirinya
+  // Jika ya, balas ke path private sendiri agar tidak bocor ke anggota lain
+  const myMember=members.find(m=>m.username===currentUser.username||m.id===currentUser.memberKey);
+  const myId=myMember?myMember.id:(currentUser.memberKey||null);
+  // Cek dari _myPrivateMsgs (data asli dari chat_private_{myId}), bukan _chatData gabungan
+  const hasPrivateMsg=myId&&_myPrivateMsgs.length>0;
+  if(hasPrivateMsg&&myId){
+    // Ada pesan private → balas ke path private milik anggota ini
+    const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
+               targets:[myId],targetNames:currentUser.name,channel:'tertentu'};
+    inp.value='';inp.style.height='auto';
+    fbPush('chat_private_'+myId,msg);
+    setTimeout(()=>scrollChatToBottom(true),50);
+    return;
+  }
+  // Tidak ada pesan private → kirim ke chat_all (broadcast biasa)
+  const msgAll={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
              targets:'all',channel:'all'};
   inp.value='';inp.style.height='auto';
-  fbPush(path,msg);
+  fbPush('chat_all',msgAll);
   setTimeout(()=>scrollChatToBottom(true),50);
 }
 
