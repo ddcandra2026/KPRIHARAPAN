@@ -1132,13 +1132,19 @@ function subscribeRealtime(){
   }));
 
   // CHAT badge — listen to chat_all for new message notification
-  let _prevChatCount=0;
+  // Initialize count from existing data so we only badge on NEW messages
+  let _prevChatCount=-1; // -1 = not initialized yet
   _unsubs.push(listenPath('chat_all',snap=>{
     const raw=snap.exists()?snap.val():null;
     const incoming=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
+    if(_prevChatCount===-1){
+      // First load — just record count, don't show badge
+      _prevChatCount=incoming.length;
+      _chatData['chat_all']=incoming;
+      return;
+    }
     if(!isPageActive('chat')){
-      if(incoming.length>_prevChatCount&&currentUser&&_prevChatCount>0){
-        // New message arrived
+      if(incoming.length>_prevChatCount&&currentUser){
         const badge=document.getElementById('chat-badge');
         if(badge)badge.style.display='flex';
         const latest=incoming[incoming.length-1];
@@ -1301,7 +1307,7 @@ function goPage(page){
   if(currentUser)saveSession(page);
 }
 
-function renderAll(){renderBeranda();renderNP();buildCharts();}
+function renderAll(){renderBeranda();buildCharts();if(notifList.length)renderNP();}
 
 // MEMBER HELPERS
 function getMemberData(){return currentUser.memberKey?members.find(x=>x.id===currentUser.memberKey):null;}
@@ -2266,15 +2272,11 @@ function initChatPage(){
 function renderNP(){
   const el=document.getElementById('np-list');
   if(!el)return;
-  // Update bell dot - show red dot only when there are notifications
+  // Sync ndot with notifList
   const ndot=document.querySelector('.ndot');
   if(ndot){
-    if(notifList.length){
-      ndot.style.display='block';
-      ndot.style.background='var(--err)';
-    } else {
-      ndot.style.display='none';
-    }
+    ndot.style.display=notifList.length>0?'block':'none';
+    if(notifList.length>0)ndot.style.background='var(--err)';
   }
   if(!notifList.length){
     el.innerHTML='<div style="text-align:center;padding:28px 0;color:var(--muted);font-size:.8rem;">Belum ada notifikasi</div>';
