@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<!-- KPRI Harapan v20260523-141551 -->
+<!-- KPRI Harapan v20260524-fix-badge-privacy -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1153,13 +1153,45 @@ function subscribeRealtime(){
             text:`💬 Pesan baru dari ${latest.user}: "${(latest.text||'').substring(0,40)}"`,
             time:'Baru saja',color:'var(--pur)'
           });
-          renderNP();
+          renderNP();showBellDot();
         }
       }
       _chatData['chat_all']=incoming;
     }
     _prevChatCount=incoming.length;
   }));
+
+  // CHAT badge — listen to chat_private_xxx (pesan khusus untuk anggota ini)
+  if(currentUser&&currentUser.role!=='pengurus'){
+    const myMember=members.find(m=>m.username===currentUser.username||m.id===currentUser.memberKey);
+    const myId=myMember?myMember.id:(currentUser.memberKey||null);
+    if(myId){
+      let _prevPrivateCount=-1;
+      _unsubs.push(listenPath('chat_private_'+myId,snap=>{
+        const raw=snap.exists()?snap.val():null;
+        const incoming=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
+        if(_prevPrivateCount===-1){
+          _prevPrivateCount=incoming.length;
+          return;
+        }
+        if(!isPageActive('chat')){
+          if(incoming.length>_prevPrivateCount&&currentUser){
+            const badge=document.getElementById('chat-badge');
+            if(badge)badge.style.display='flex';
+            const latest=incoming[incoming.length-1];
+            if(latest&&latest.user!==currentUser.name){
+              notifList.unshift({
+                text:`💬 Pesan khusus dari ${latest.user}: "${(latest.text||'').substring(0,40)}"`,
+                time:'Baru saja',color:'var(--teal)'
+              });
+              renderNP();showBellDot();
+            }
+          }
+        }
+        _prevPrivateCount=incoming.length;
+      }));
+    }
+  }
 }
 
 // ========== END FIREBASE SYNC HELPERS ==========
@@ -2047,7 +2079,12 @@ function subscribeCurrentChannel(){
         if(m.channel==='tertentu')return false;  // privat, skip
         return true; // broadcast
       });
-      const all=[...pub,...privateMsgs].sort((a,b)=>(a.id||0)-(b.id||0));
+      // Private: WAJIB verifikasi targets mengandung myId (cegah kebocoran data)
+      const priv=privateMsgs.filter(m=>{
+        if(!Array.isArray(m.targets))return false;
+        return myId&&m.targets.includes(myId);
+      });
+      const all=[...pub,...priv].sort((a,b)=>(a.id||0)-(b.id||0));
       _chatData['chat_all']=all;
       if(isPageActive('chat'))renderChat();
     };
