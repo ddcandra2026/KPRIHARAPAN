@@ -13,19 +13,26 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyD-OFY2sfut6LeUSvi_3xjcU4CmmKTdKZE",
-    authDomain: "kpri-harapan.firebaseapp.com",
-    databaseURL: "https://kpri-harapan-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "kpri-harapan",
-    storageBucket: "kpri-harapan.firebasestorage.app",
-    messagingSenderId: "288948311856",
-    appId: "1:288948311856:web:80e8da97439477c31fdaf5"
-  };
+// If opened from file://, Firebase won't work - show warning
+if(location.protocol==='file:'){
+  document.addEventListener('DOMContentLoaded',function(){
+    const el=document.getElementById('fb-loading-txt');
+    if(el)el.innerHTML='⚠️ Buka via GitHub Pages,<br>bukan dari file lokal.<br><a href="https://ddcandra2026.github.io/KPRIHARAPAN/" style="color:#93c5fd;font-size:.8rem;">Klik di sini →</a>';
+  });
+}
+(function(){
   try {
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-OFY2sfut6LeUSvi_3xjcU4CmmKTdKZE",
+      authDomain: "kpri-harapan.firebaseapp.com",
+      databaseURL: "https://kpri-harapan-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "kpri-harapan",
+      storageBucket: "kpri-harapan.firebasestorage.app",
+      messagingSenderId: "288948311856",
+      appId: "1:288948311856:web:80e8da97439477c31fdaf5"
+    };
     firebase.initializeApp(firebaseConfig);
     const _db = firebase.database();
-    // Expose helpers using compat API (no ES module needed)
     window._fb = {
       db: _db,
       ref: (path) => _db.ref(path),
@@ -43,6 +50,7 @@
     window._fbReady = false;
     document.dispatchEvent(new Event('firebase-ready'));
   }
+})();
 </script>
 <style>
 :root{
@@ -66,22 +74,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .sp-logo{width:82px;height:82px;background:rgba(255,255,255,.15);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;margin-bottom:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);border:2px solid rgba(255,255,255,.25);animation:pop .6s cubic-bezier(.34,1.56,.64,1);}
 .sp-logo-img{width:82px;height:82px;border-radius:22px;object-fit:cover;margin-bottom:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);border:2px solid rgba(255,255,255,.25);animation:pop .6s cubic-bezier(.34,1.56,.64,1);display:block;}
 @keyframes pop{from{transform:scale(.4);opacity:0;}to{transform:scale(1);opacity:1;}}
-.sp-title{font-family:'DM Sans',sans-serif;font-size:1.75rem;color:#fff;font-weight:900;letter-spacing:-.5px;animation:fu .5s .2s both;}
-.sp-sub{color:rgba(255,255,255,.6);font-size:.79rem;margin-top:3px;margin-bottom:30px;animation:fu .5s .3s both;}
+.sp-title{font-family:'DM Sans',sans-serif;font-size:1.9rem;color:#fff;font-weight:900;letter-spacing:-.5px;animation:fu .5s .2s both;text-shadow:0 2px 12px rgba(0,0,0,.2);}
+.sp-sub{color:rgba(255,255,255,.75);font-size:.82rem;margin-top:4px;margin-bottom:28px;animation:fu .5s .3s both;font-weight:600;letter-spacing:.3px;}
 @keyframes fu{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-#lbox{background:rgba(255,255,255,.09);backdrop-filter:blur(24px);border:1.5px solid rgba(255,255,255,.18);border-radius:22px;padding:22px 18px;width:calc(100% - 32px);max-width:380px;animation:fu .5s .4s both;}
+#lbox{background:rgba(255,255,255,.1);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1.5px solid rgba(255,255,255,.22);border-radius:22px;padding:24px 20px;width:calc(100% - 32px);max-width:380px;animation:fu .5s .4s both;}
 .lhint{background:rgba(255,255,255,.08);border-radius:9px;padding:8px 11px;margin-bottom:13px;font-size:.7rem;color:rgba(255,255,255,.68);line-height:1.75;}
 .lhint b{color:var(--acc-l);}
 .role-row{display:flex;gap:7px;margin-bottom:13px;}
-.rbtn{flex:1;padding:8px;border:1.5px solid rgba(255,255,255,.2);border-radius:9px;background:transparent;color:rgba(255,255,255,.55);font-size:.75rem;font-family:inherit;cursor:pointer;transition:.2s;font-weight:700;}
-.rbtn.on{background:var(--acc);border-color:var(--acc);color:#000;}
-.ll{color:rgba(255,255,255,.72);font-size:.7rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;display:block;}
-.li{width:100%;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:10px;padding:10px 13px;color:#fff;font-size:.9rem;font-family:inherit;outline:none;margin-bottom:11px;transition:.2s;}
-.li::placeholder{color:rgba(255,255,255,.3);}
-.li:focus{border-color:var(--acc);background:rgba(255,255,255,.15);}
-.lbtn{width:100%;padding:12px;background:linear-gradient(135deg,var(--acc),#f97316);border:none;border-radius:11px;color:#000;font-weight:900;font-size:.92rem;font-family:inherit;cursor:pointer;box-shadow:0 4px 20px rgba(245,158,11,.35);}
+.rbtn{flex:1;padding:8px;border:1.5px solid rgba(255,255,255,.25);border-radius:9px;background:transparent;color:rgba(255,255,255,.65);font-size:.78rem;font-family:inherit;cursor:pointer;transition:.2s;font-weight:800;}
+.rbtn.on{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.75);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.2);}
+.ll{color:rgba(255,255,255,.85);font-size:.72rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px;display:block;}
+.li{width:100%;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.22);border-radius:10px;padding:11px 14px;color:#fff;font-size:.9rem;font-family:inherit;font-weight:600;outline:none;margin-bottom:11px;transition:.2s;}
+.li::placeholder{color:rgba(255,255,255,.4);}
+.li:focus{border-color:rgba(255,255,255,.7);background:rgba(255,255,255,.16);}
+.lbtn{width:100%;padding:13px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.4);border-radius:11px;color:#fff;font-weight:900;font-size:.95rem;font-family:inherit;cursor:pointer;letter-spacing:.3px;backdrop-filter:blur(4px);transition:.2s;}
+.lbtn:hover{background:rgba(255,255,255,.28);}
 .lbtn:active{transform:scale(.97);}
-.lerr{color:#fca5a5;font-size:.72rem;text-align:center;margin-top:6px;min-height:16px;}
+.lerr{color:#fed7d7;font-size:.74rem;font-weight:700;text-align:center;margin-top:8px;min-height:16px;}
 #app{display:none;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto;position:relative;overflow:hidden;}
 #app.on{display:flex;}
 .topbar{background:linear-gradient(135deg,var(--pri-d),var(--pri));padding:12px 15px 11px;flex-shrink:0;z-index:50;}
@@ -329,11 +338,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .toast.acc{background:var(--acc);color:#000;}
 .wm{text-align:center;padding:11px 0 3px;color:var(--muted);font-size:.63rem;opacity:.6;}
 .wm b{color:var(--pri);font-weight:800;}
-#fb-loading{position:fixed;inset:0;z-index:10000;background:rgba(8,50,88,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;transition:opacity .4s;}
+#fb-loading{position:fixed;inset:0;z-index:10000;background:rgba(8,50,88,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;transition:opacity .4s;}
 #fb-loading.hide{opacity:0;pointer-events:none;}
-.fb-spinner{width:40px;height:40px;border:3.5px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+.fb-spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.fb-txt{color:#fff;font-size:.83rem;font-weight:700;opacity:.85;}
+.fb-txt{color:#fff;font-size:.83rem;font-weight:700;opacity:.9;text-align:center;}
+.fb-skip{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;color:#fff;padding:7px 18px;font-size:.76rem;cursor:pointer;margin-top:4px;font-weight:700;}
+.fb-skip:hover{background:rgba(255,255,255,.25);}
 .info-box{background:var(--inf-l);border:1px solid #bfdbfe;border-radius:9px;padding:9px 11px;font-size:.73rem;color:#1e40af;line-height:1.6;margin-bottom:10px;}
 .info-box.ok{background:var(--ok-l);border-color:#a7f3d0;color:var(--ok-d);}
 .info-box.acc{background:var(--acc-l);border-color:#fcd34d;color:#92400e;}
@@ -347,7 +358,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
 .cred-val{font-weight:800;color:var(--pri);font-family:monospace;background:#fff;padding:3px 9px;border-radius:6px;border:1px solid var(--border);font-size:.82rem;}
 </style></head>
 <body>
-<div id="fb-loading"><div class="fb-spinner"></div><div class="fb-txt" id="fb-loading-txt">Menghubungkan ke server...</div></div>
+<div id="fb-loading"><div class="fb-spinner"></div><div class="fb-txt" id="fb-loading-txt">Menghubungkan ke server...</div><button class="fb-skip" onclick="hideFbLoading()">Lewati →</button></div>
 <div id="splash">
   <div class="sp-c sp-c1"></div><div class="sp-c sp-c2"></div>
   <div id="sp-logo-wrap"><div class="sp-logo" id="sp-logo-icon">🏦</div></div>
@@ -592,6 +603,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
           <button class="ch-btn on" id="ch-btn-pengurus" onclick="switchChannel('pengurus',this)">🔑 Sesama Pengurus</button>
           <button class="ch-btn" id="ch-btn-all" onclick="switchChannel('all',this)">👥 Semua Anggota</button>
           <button class="ch-btn" id="ch-btn-tertentu" onclick="switchChannel('tertentu',this)">🎯 Anggota Tertentu</button>
+          <button class="ch-btn" style="background:var(--err-l);color:var(--err);border-color:var(--err);" onclick="clearChatConfirm()">🗑️ Hapus Semua</button>
         </div>
         <div id="ch-tertentu-list" style="display:none;margin-top:8px;max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:9px;padding:8px;background:var(--bg);">
           <div style="font-size:.65rem;color:var(--muted);margin-bottom:5px;font-weight:700;">Centang anggota yang dituju:</div>
@@ -2143,8 +2155,10 @@ function sendChat(){
   if(isP&&_currentChannel==='tertentu'){
     const checked=[...document.querySelectorAll('#ch-member-checks input:checked')];
     if(!checked.length){showToast('❌ Pilih minimal 1 anggota yang dituju','err');return;}
-    const targets=checked.map(c=>c.value); // array of member IDs
+    const targets=checked.map(c=>c.value); // array of member IDs only
     const targetNames=checked.map(c=>c.dataset.name).join(', ');
+    // Confirm before sending private message
+    if(!confirm(`Kirim pesan PRIVAT ke:\n${targetNames}\n\nAnggota lain TIDAK akan melihat pesan ini.\nLanjutkan?`))return;
     const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
                targets,targetNames,channel:'tertentu'};
     inp.value='';inp.style.height='auto';
@@ -2153,7 +2167,6 @@ function sendChat(){
     return;
   }
   const path=isP&&_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
-  // 'all' channel — no targets restriction, visible to everyone
   const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
              targets:'all',channel:'all'};
   inp.value='';inp.style.height='auto';
@@ -2169,6 +2182,17 @@ function attachFile(input){
   input.value='';
   fbPush(path,msg);
   showToast('📎 File dilampirkan','ok');
+}
+
+function clearChatConfirm(){
+  const path=_currentChannel==='pengurus'?'chat_pengurus':'chat_all';
+  const label=_currentChannel==='pengurus'?'Forum Pengurus':'Forum Semua Anggota';
+  if(!confirm(`Hapus SEMUA pesan di "${label}"?\n\nTindakan ini tidak bisa dibatalkan.`))return;
+  fbSet(path,null).then(()=>{
+    _chatData[path]=[];
+    renderChat();
+    showToast('🗑️ Semua pesan dihapus','ok');
+  });
 }
 
 function buildMemberChecklist(){
@@ -2577,22 +2601,22 @@ loadSettings();
 // Hide loading overlay once Firebase is ready (or fallback after 4s)
 function hideFbLoading(){
   const el=document.getElementById('fb-loading');
-  if(el){el.classList.add('hide');setTimeout(()=>el.style.display='none',500);}
+  if(el){el.classList.add('hide');setTimeout(()=>el.style.display='none',400);}
 }
 function showFbError(){
   const txt=document.getElementById('fb-loading-txt');
-  if(txt){txt.innerHTML='⚠️ Koneksi ke Firebase gagal.<br><span style="font-size:.72rem;opacity:.75;">Cek Rules di Firebase Console:<br>Database → Rules → set read/write: true</span>';}
-  // Still allow app to open after showing error
-  setTimeout(hideFbLoading,4000);
+  if(txt)txt.innerHTML='⚠️ Server lambat. Klik <b>Lewati</b> untuk lanjut.';
 }
+// Hide after 2s max — don't make user wait
 if(window._fbReady){hideFbLoading();}
 else{
   document.addEventListener('firebase-ready',hideFbLoading);
-  // If not ready in 5s, show error then dismiss
   setTimeout(()=>{
     if(!window._fbReady)showFbError();
     else hideFbLoading();
-  },5000);
+  },2000);
+  // Force hide after 4s no matter what
+  setTimeout(hideFbLoading,4000);
 }
 </script>
 </body>
