@@ -1229,6 +1229,8 @@ async function doLogin(restoredUser, restoredPage){
   setupRole();renderAll();
   subscribeRealtime();
   initNotifications();
+  // Fix old chat messages format (run once for pengurus)
+  if(currentUser.role==='pengurus')setTimeout(migrateOldChatMessages,3000);
   // Save session & restore last page
   saveSession(restoredPage||'beranda');
   const targetPage=restoredPage||'beranda';
@@ -2068,9 +2070,8 @@ function subscribeCurrentChannel(){
     const raw=snap.exists()?snap.val():null;
     // Sort ascending: oldest (smallest id/timestamp) first → displays at TOP
     let msgs=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
-    // If anggota: only show messages meant for them
+    // ANGGOTA FILTER: hanya tampilkan pesan yang memang untuk mereka
     if(!isP){
-      // Find this anggota's member record to get their member ID
       const myMember=members.find(m=>
         m.username===currentUser.username||
         m.id===currentUser.memberKey
@@ -2078,19 +2079,19 @@ function subscribeCurrentChannel(){
       const myMemberId=myMember?myMember.id:null;
 
       msgs=msgs.filter(msg=>{
-        // Case 1: No targets = broadcast to all → show
-        if(!msg.targets)return true;
-        // Case 2: targets = 'all' string = broadcast → show
-        if(msg.targets==='all')return true;
-        // Case 3: channel = 'all' = broadcast → show
-        if(msg.channel==='all')return true;
-        // Case 4: targets is array = targeted message
-        if(Array.isArray(msg.targets)){
-          // Show ONLY if this anggota's member ID is in the targets list
+        // Pesan channel 'tertentu' = privat, cek targets
+        if(msg.channel==='tertentu'){
+          if(!Array.isArray(msg.targets))return false;
           return myMemberId&&msg.targets.includes(myMemberId);
         }
-        // Default: hide unknown formats
-        return false;
+        // Pesan channel 'all' atau tidak ada channel = semua bisa lihat
+        // TAPI jika punya targets array = tetap privat
+        if(Array.isArray(msg.targets)){
+          // Punya targets array = pesan privat
+          return myMemberId&&msg.targets.includes(myMemberId);
+        }
+        // targets='all' atau tidak ada targets = broadcast, semua bisa lihat
+        return true;
       });
     }
     _chatData[path]=msgs;
@@ -2155,14 +2156,14 @@ function sendChat(){
   if(isP&&_currentChannel==='tertentu'){
     const checked=[...document.querySelectorAll('#ch-member-checks input:checked')];
     if(!checked.length){showToast('❌ Pilih minimal 1 anggota yang dituju','err');return;}
-    const targets=checked.map(c=>c.value); // array of member IDs only
+    const targets=checked.map(c=>c.value);
     const targetNames=checked.map(c=>c.dataset.name).join(', ');
-    // Confirm before sending private message
-    if(!confirm(`Kirim pesan PRIVAT ke:\n${targetNames}\n\nAnggota lain TIDAK akan melihat pesan ini.\nLanjutkan?`))return;
+    // No confirm popup - just send with toast feedback
     const msg={id:Date.now(),user:currentUser.name,text,time:nowTime(),tgl:today(),
                targets,targetNames,channel:'tertentu'};
     inp.value='';inp.style.height='auto';
     fbPush('chat_all',msg);
+    showToast(`🎯 Terkirim ke: ${targetNames}`,'ok');
     setTimeout(()=>scrollChatToBottom(true),50);
     return;
   }
@@ -2193,6 +2194,33 @@ function clearChatConfirm(){
     renderChat();
     showToast('🗑️ Semua pesan dihapus','ok');
   });
+}
+
+// Auto-fix: clean up old messages with wrong channel/targets format
+function migrateOldChatMessages(){
+  if(!window._fb||currentUser.role!=='pengurus')return;
+  window._fb.ref('chat_all').get().then(snap=>{
+    if(!snap.exists())return;
+    const raw=toSafeArray(snap.val()).filter(Boolean);
+    let needsFix=false;
+    const fixed=raw.map(msg=>{
+      // Old messages sent as 'tertentu' but with targets='all' string - fix to broadcast
+      if(msg.channel==='tertentu'&&msg.targets==='all'){
+        needsFix=true;
+        return{...msg,channel:'all',targets:'all'};
+      }
+      // Old messages with no channel field - set as broadcast
+      if(!msg.channel){
+        needsFix=true;
+        return{...msg,channel:'all',targets:msg.targets||'all'};
+      }
+      return msg;
+    });
+    if(needsFix){
+      fbSet('chat_all',fixed);
+      console.log('Migrated old chat messages');
+    }
+  }).catch(()=>{});
 }
 
 function buildMemberChecklist(){
