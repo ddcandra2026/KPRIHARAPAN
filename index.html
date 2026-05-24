@@ -604,6 +604,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overf
           <button class="ch-btn" id="ch-btn-all" onclick="switchChannel('all',this)">👥 Semua Anggota</button>
           <button class="ch-btn" id="ch-btn-tertentu" onclick="switchChannel('tertentu',this)">🎯 Anggota Tertentu</button>
           <button class="ch-btn" style="background:var(--err-l);color:var(--err);border-color:var(--err);" onclick="clearChatConfirm()">🗑️ Hapus Semua</button>
+          <button class="ch-btn" style="background:var(--bg);color:var(--muted);font-size:.65rem;" onclick="debugChatData()">🔍 Debug</button>
         </div>
         <div id="ch-tertentu-list" style="display:none;margin-top:8px;max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:9px;padding:8px;background:var(--bg);">
           <div style="font-size:.65rem;color:var(--muted);margin-bottom:5px;font-weight:700;">Centang anggota yang dituju:</div>
@@ -2072,26 +2073,30 @@ function subscribeCurrentChannel(){
     let msgs=toSafeArray(raw).filter(Boolean).sort((a,b)=>(a.id||0)-(b.id||0));
     // ANGGOTA FILTER: hanya tampilkan pesan yang memang untuk mereka
     if(!isP){
-      const myMember=members.find(m=>
-        m.username===currentUser.username||
-        m.id===currentUser.memberKey
-      );
-      const myMemberId=myMember?myMember.id:null;
+      // Get member ID with multiple fallbacks
+      let myMemberId=currentUser.memberKey||null;
+      if(!myMemberId){
+        const myMember=members.find(m=>m.username===currentUser.username);
+        if(myMember)myMemberId=myMember.id;
+      }
 
       msgs=msgs.filter(msg=>{
-        // Pesan channel 'tertentu' = privat, cek targets
-        if(msg.channel==='tertentu'){
-          if(!Array.isArray(msg.targets))return false;
-          return myMemberId&&msg.targets.includes(myMemberId);
-        }
-        // Pesan channel 'all' atau tidak ada channel = semua bisa lihat
-        // TAPI jika punya targets array = tetap privat
+        // Pesan tanpa targets = broadcast = semua lihat
+        if(!msg.targets&&!msg.channel)return true;
+        // Pesan channel 'all' tanpa targets array = broadcast
+        if(msg.channel==='all'&&msg.targets==='all')return true;
+        if(msg.channel==='all'&&!msg.targets)return true;
+        if(!msg.channel&&msg.targets==='all')return true;
+        if(!msg.channel&&!msg.targets)return true;
+        // Pesan dengan targets array = PRIVAT
         if(Array.isArray(msg.targets)){
-          // Punya targets array = pesan privat
-          return myMemberId&&msg.targets.includes(myMemberId);
+          if(!myMemberId)return false; // tidak tahu siapa saya = tidak tampilkan
+          return msg.targets.includes(myMemberId);
         }
-        // targets='all' atau tidak ada targets = broadcast, semua bisa lihat
-        return true;
+        // channel='tertentu' tanpa array targets = sembunyikan
+        if(msg.channel==='tertentu')return false;
+        // Default: broadcast
+        return msg.targets==='all';
       });
     }
     _chatData[path]=msgs;
@@ -2183,6 +2188,20 @@ function attachFile(input){
   input.value='';
   fbPush(path,msg);
   showToast('📎 File dilampirkan','ok');
+}
+
+// Debug: show raw Firebase chat data (pengurus only)
+function debugChatData(){
+  if(!window._fb||!currentUser||currentUser.role!=='pengurus')return;
+  window._fb.ref('chat_all').get().then(snap=>{
+    if(!snap.exists()){showToast('Chat kosong di Firebase','ok');return;}
+    const msgs=toSafeArray(snap.val()).filter(Boolean);
+    let info=`Total pesan: ${msgs.length}\n\n`;
+    msgs.forEach((m,i)=>{
+      info+=`[${i+1}] ${m.user} - channel:${m.channel||'NONE'} targets:${JSON.stringify(m.targets)||'NONE'}\n`;
+    });
+    alert(info);
+  });
 }
 
 function clearChatConfirm(){
